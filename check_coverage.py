@@ -30,8 +30,6 @@ class ConformanceStatementFinder(HTMLParser):
 
     if "conform" not in attr_map["class"]:
       return
-    if "server" not in attr_map["class"]:
-      return
 
     self.conformance_ids.add(attr_map["id"])
 

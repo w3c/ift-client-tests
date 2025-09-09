@@ -14,12 +14,12 @@ if len(sys.argv) < 2 or sys.argv[1] not in ("pass", "fail"):
 mode = sys.argv[1]
 
 # Input and output files
-input_font_path = "Roboto-Regular.ttf"
-subset_font_path = "Roboto-subset.ttf"
-final_font_path = f"Roboto-subset-{mode}.ttf"
+input_font_path = "resources/Roboto-Regular.ttf"
+subset_font_path = "out/Roboto-subset.ttf"
+final_font_path = f"out/Roboto-subset-{mode}.ttf"
 
 # Step 1: Subset the font to keep only required glyphs
-glyphs_to_keep = ["a", "f", "i", "l", "p", "s"]
+glyphs_to_keep = ["A", "F", "I", "L", "P", "S"]
 
 font = TTFont(input_font_path)
 
@@ -64,21 +64,30 @@ if "GSUB" not in font:
 if mode == "pass":
     fea_code = """
 feature liga {
-    sub p by p a s s;
-    sub f by f a i l;
+    sub P by P A S S;
+    sub F by F A I L;
 } liga;
 """
 else:
     fea_code = """
 feature liga {
-    sub p by f a i l;
-    sub f by p a s s;
+    sub P by F A I L;
+    sub F by P A S S;
 } liga;
 """
 
 # Add the feature to the font
 addOpenTypeFeaturesFromString(font, fea_code)
 
+
 # Save the final font
 font.save(final_font_path)
 print(f"Font saved to {final_font_path}")
+
+# Remove the intermediate subset font file
+import os
+try:
+    os.remove(subset_font_path)
+    print(f"Removed intermediate file: {subset_font_path}")
+except Exception as e:
+    print(f"Warning: Could not remove {subset_font_path}: {e}")

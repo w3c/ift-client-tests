@@ -1,14 +1,25 @@
+
+
+import sys
 from fontTools.ttLib import TTFont, newTable
 from fontTools.subset import Subsetter, Options
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 
+
+# Check command line argument at the top and set output file accordingly
+if len(sys.argv) < 2 or sys.argv[1] not in ("pass", "fail"):
+    print("Usage: python makeFallbackFont.py [pass|fail]")
+    sys.exit(1)
+
+mode = sys.argv[1]
+
 # Input and output files
 input_font_path = "Roboto-Regular.ttf"
 subset_font_path = "Roboto-subset.ttf"
-final_font_path = "Roboto-subset-modified.ttf"
+final_font_path = f"Roboto-subset-{mode}.ttf"
 
 # Step 1: Subset the font to keep only required glyphs
-glyphs_to_keep = ["a", "b", "f", "i", "l", "p", "s"]
+glyphs_to_keep = ["a", "f", "i", "l", "p", "s"]
 
 font = TTFont(input_font_path)
 
@@ -24,10 +35,11 @@ subsetter.populate(glyphs=glyphs_to_keep + [".notdef", "space"])
 subsetter.subset(font)
 font.save(subset_font_path)
 
+
 # Step 2: Reload the subset font and add GSUB feature for a → p a s s
 font = TTFont(subset_font_path)
 
-new_name = "RobotoFallback"
+new_name = f"RobotoFallback{mode.capitalize()}"
 
 # Name IDs you typically want to change:
 # 1: Font Family name
@@ -47,11 +59,20 @@ for record in name_table.names:
 if "GSUB" not in font:
     font["GSUB"] = newTable("GSUB")
 
-# Use feaLib to define the GSUB substitution
-fea_code = """
+
+# Determine mapping based on command line argument
+if mode == "pass":
+    fea_code = """
 feature liga {
-    sub a by p a s s;
-    sub b by f a i l;
+    sub p by p a s s;
+    sub f by f a i l;
+} liga;
+"""
+else:
+    fea_code = """
+feature liga {
+    sub p by f a i l;
+    sub f by p a s s;
 } liga;
 """
 

@@ -1,6 +1,7 @@
 
-
+import os
 import sys
+from testCaseGeneratorLib.paths import TTFSourcePath, fallbackDirectory
 from fontTools.ttLib import TTFont, newTable
 from fontTools.subset import Subsetter, Options
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -11,12 +12,18 @@ if len(sys.argv) < 2 or sys.argv[1] not in ("pass", "fail"):
     print("Usage: python makeFallbackFont.py [pass|fail]")
     sys.exit(1)
 
+
+if not os.path.exists(fallbackDirectory):
+    os.makedirs(fallbackDirectory)
+
+
+
 mode = sys.argv[1]
 
 # Input and output files
-input_font_path = "resources/Roboto-Regular.ttf"
-subset_font_path = "out/Roboto-subset.ttf"
-final_font_path = f"out/Roboto-subset-{mode}.ttf"
+input_font_path = TTFSourcePath
+subset_font_path = os.path.join(fallbackDirectory, "Roboto-subset.ttf")
+final_font_path = os.path.join(fallbackDirectory, f"Roboto-subset-{mode}.ttf")
 
 # Step 1: Subset the font to keep only required glyphs
 glyphs_to_keep = ["A", "F", "I", "L", "P", "S"]

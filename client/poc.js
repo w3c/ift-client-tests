@@ -3,7 +3,7 @@ import init, { IftState } from './rust-client/pkg/rust_client.js';
 let states = {};
 
 async function update_all_fonts() {
-  let title_font = "fonts/roboto/myfont.ift.ttf";
+  let title_font = "fonts/ift/test_name_goes_here/myfont-mod.ift.otf";
   let title_text = document.getElementById("title_ur").innerText;
   let p1 = update_fonts(title_text,
     title_font,

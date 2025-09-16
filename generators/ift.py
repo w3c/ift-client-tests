@@ -2,10 +2,15 @@ import os
 from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import IFTSourcePath, IFTTestDirectory
 
+
+# TODO:  Need to create sub-directory for each IFT because they are multiple files
 if not os.path.exists(IFTTestDirectory):
     os.makedirs(IFTTestDirectory)
 
-outPath = os.path.join(IFTTestDirectory, "myfont-mod.ift.otf");
+testDirectory = os.path.join(IFTTestDirectory, "test_name_goes_here");
+if not os.path.exists(testDirectory):
+    os.makedirs(testDirectory)
+outPath = os.path.join(testDirectory, "myfont-mod.ift.otf");
 font = TTFont(IFTSourcePath)
 
 if "IFT " not in font:

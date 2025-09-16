@@ -1,4 +1,0 @@
-rm *_tk
-rm *_gk
-rm *.ttf
-cp  /Users/treudes/Sites/ift-encoder/out/* ./

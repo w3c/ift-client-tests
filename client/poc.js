@@ -3,6 +3,15 @@ import init, { IftState } from './rust-client/pkg/rust_client.js';
 let states = {};
 
 async function update_all_fonts() {
+  /* TODO: 
+  get all result elements by class name
+  for each element in result elements
+    grab the test name from the element id or class or a data atribute.
+    get font path from test name
+    get font family name from test name
+    create new FontFace object with path and font family name
+    add "style" attribute to element referencing the font family name
+  */
   let title_font = "fonts/ift/test_name_goes_here/myfont-mod.ift.otf";
   let title_text = document.getElementById("title_ur").innerText;
   let p1 = update_fonts(title_text,

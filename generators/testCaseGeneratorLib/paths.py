@@ -30,7 +30,9 @@ TTFSourcePath = os.path.join(resourcesDirectory, "Roboto-Regular.ttf")
 IFTSourcePath = os.path.join(resourcesDirectory, "myfont.ift.ttf")
 
 # directories for test output
-IFTTestDirectory = os.path.join(mainDirectory, "IFT")
+fontsDirectory = os.path.join(mainDirectory, "client","fonts")
+IFTTestDirectory = os.path.join(fontsDirectory, "IFT")
+fallbackDirectory = os.path.join(fontsDirectory, "fallback")
 
 if __name__ == "__main__":
     import doctest

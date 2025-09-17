@@ -6,7 +6,7 @@ async function update_all_fonts() {
   // Get all elements with class 'result'
   const resultElements = document.getElementsByClassName('result');
   for (let el of resultElements) {
-    let test_name = el.id; // "conform-format1-valid-format-number";
+    let test_name = el.id;
     let title_font = `fonts/ift/${test_name}/myfont-mod.ift.otf`;
     let title_text = document.getElementById(test_name).innerText;
     let font_name = test_name + " IFT Font";
@@ -22,13 +22,18 @@ async function update_all_fonts() {
       // throw error
     }
     el.style.fontFamily = `${font_name}, ${fallback_font_name}`;
-    let p1 = update_fonts(title_text,
-      title_font,
-      font_name,
-      [],
-      {});
-    let f1 = await p1;
-    document.fonts.add(f1);
+    try {
+      let p1 = update_fonts(title_text,
+        title_font,
+        font_name,
+        [],
+        {});
+      let f1 = await p1;
+      document.fonts.add(f1);
+    } catch (e) {
+      console.error(`Error updating font for ${test_name}:`, e);
+      continue; // Skip to the next element
+    }
     console.log('Found result element:', el);
   }
 }

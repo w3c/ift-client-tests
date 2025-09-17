@@ -7,23 +7,16 @@ from fontTools.subset import Subsetter, Options
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 
 
-# Check command line argument at the top and set output file accordingly
-if len(sys.argv) < 2 or sys.argv[1] not in ("pass", "fail"):
-    print("Usage: python makeFallbackFont.py [pass|fail]")
-    sys.exit(1)
-
-
 if not os.path.exists(fallbackDirectory):
     os.makedirs(fallbackDirectory)
 
 
 
-mode = sys.argv[1]
 
 # Input and output files
 input_font_path = TTFSourcePath
 subset_font_path = os.path.join(fallbackDirectory, "Roboto-subset.ttf")
-final_font_path = os.path.join(fallbackDirectory, f"Roboto-subset-{mode}.ttf")
+final_font_path = os.path.join(fallbackDirectory, f"Roboto.ttf")
 
 # Step 1: Subset the font to keep only required glyphs
 glyphs_to_keep = ["A", "F", "I", "L", "P", "S"]
@@ -46,7 +39,7 @@ font.save(subset_font_path)
 # Step 2: Reload the subset font and add GSUB feature for a → p a s s
 font = TTFont(subset_font_path)
 
-new_name = f"RobotoFallback{mode.capitalize()}"
+new_name = "RobotoFallback"
 
 # Name IDs you typically want to change:
 # 1: Font Family name
@@ -68,18 +61,10 @@ if "GSUB" not in font:
 
 
 # Determine mapping based on command line argument
-if mode == "pass":
-    fea_code = """
+fea_code = """
 feature liga {
     sub P by P A S S;
     sub F by F A I L;
-} liga;
-"""
-else:
-    fea_code = """
-feature liga {
-    sub P by F A I L;
-    sub F by P A S S;
 } liga;
 """
 

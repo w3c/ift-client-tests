@@ -12,16 +12,23 @@ async function update_all_fonts() {
     create new FontFace object with path and font family name
     add "style" attribute to element referencing the font family name
   */
-  let title_font = "fonts/ift/test_name_goes_here/myfont-mod.ift.otf";
-  let title_text = document.getElementById("title_ur").innerText;
-  let p1 = update_fonts(title_text,
-    title_font,
-    "Roboto IFT Font",
-    [],
-    {});
-  let f1 = await p1;
-  // document.fonts.clear();
-  document.fonts.add(f1);
+  // Get all elements with class 'result'
+  const resultElements = document.getElementsByClassName('result');
+  for (let el of resultElements) {
+    let test_name = el.id; // "conform-format1-valid-format-number";
+    let title_font = `fonts/ift/${test_name}/myfont-mod.ift.otf`;
+    let title_text = document.getElementById(test_name).innerText;
+    let font_name = test_name + " IFT Font";
+    el.style.fontFamily = `${font_name}, "RobotoFallbackPass"`;
+    let p1 = update_fonts(title_text,
+      title_font,
+      font_name,
+      [],
+      {});
+    let f1 = await p1;
+    document.fonts.add(f1);
+    console.log('Found result element:', el);
+  }
 }
 
 function update_fonts(text, font_id, font_face, features, ds) {

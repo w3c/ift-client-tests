@@ -10,7 +10,7 @@ if not os.path.exists(IFTTestDirectory):
     os.makedirs(IFTTestDirectory)
 
 
-testDirectory = os.path.join(IFTTestDirectory, "test_name_goes_here")
+testDirectory = os.path.join(IFTTestDirectory, "conform-format1-valid-format-number")
 if not os.path.exists(testDirectory):
     os.makedirs(testDirectory)
 

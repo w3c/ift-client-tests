@@ -16,7 +16,7 @@ if not os.path.exists(fallbackDirectory):
 # Input and output files
 input_font_path = TTFSourcePath
 subset_font_path = os.path.join(fallbackDirectory, "Roboto-subset.ttf")
-final_font_path = os.path.join(fallbackDirectory, f"Roboto.ttf")
+final_font_path = os.path.join(fallbackDirectory, "Roboto.ttf")
 
 # Step 1: Subset the font to keep only required glyphs
 glyphs_to_keep = ["A", "F", "I", "L", "P", "S"]

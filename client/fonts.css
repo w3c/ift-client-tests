@@ -1,10 +1,5 @@
 /* fallback */
 @font-face {
-  font-family: 'RobotoFallbackPass';
-  src: url(fonts/fallback/Roboto-subset-fail.ttf) format('truetype');
-}
-
-@font-face {
-  font-family: 'RobotoFallbackFail';
-  src: url(fonts/fallback/Roboto-subset-pass.ttf) format('truetype');
+  font-family: 'RobotoFallback';
+  src: url(fonts/fallback/Roboto-subset.ttf) format('truetype');
 }

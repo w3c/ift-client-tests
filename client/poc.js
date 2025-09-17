@@ -11,16 +11,7 @@ async function update_all_fonts() {
     let title_text = document.getElementById(test_name).innerText;
     let font_name = test_name + " IFT Font";
     // check to see if element contains pass or fail class
-    let fallback_font_name;
-    if (el.classList.contains('pass')) {
-      fallback_font_name = "RobotoFallbackPass";
-    }
-    else if (el.classList.contains('fail')) {
-      fallback_font_name = "RobotoFallbackFail";
-    }
-    else {
-      // throw error
-    }
+    let fallback_font_name = "RobotoFallback";
     el.style.fontFamily = `${font_name}, ${fallback_font_name}`;
     try {
       let p1 = update_fonts(title_text,

@@ -5,23 +5,22 @@ from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import IFTSourcePath, IFTTestDirectory, resourcesDirectory
 
 
-# TODO:  Need to create sub-directory for each IFT because they are multiple files
 if not os.path.exists(IFTTestDirectory):
     os.makedirs(IFTTestDirectory)
 
+test_name = "conform-format1-valid-format-number"
+test_directory = os.path.join(IFTTestDirectory, test_name)
+if not os.path.exists(test_directory):
+    os.makedirs(test_directory)
 
-testDirectory = os.path.join(IFTTestDirectory, "conform-format1-valid-format-number")
-if not os.path.exists(testDirectory):
-    os.makedirs(testDirectory)
-
-# Copy _gk and _tk files from resources/IFT/ to testDirectory
+# Copy _gk and _tk files from resources/IFT/ to test_directory
 source_dir = os.path.join(resourcesDirectory, "IFT")
 for pattern in ("*_gk", "*_tk"):
     for file_path in glob.glob(os.path.join(source_dir, pattern)):
-        shutil.copy(file_path, testDirectory)
-        print(f"Copied {file_path} to {testDirectory}")
+        shutil.copy(file_path, test_directory)
+        print(f"Copied {file_path} to {test_directory}")
 
-outPath = os.path.join(testDirectory, "myfont-mod.ift.otf");
+outPath = os.path.join(test_directory, "myfont-mod.ift.otf");
 font = TTFont(IFTSourcePath)
 
 if "IFT " not in font:

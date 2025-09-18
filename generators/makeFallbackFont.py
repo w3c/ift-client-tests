@@ -14,17 +14,21 @@ if not os.path.exists(fallbackDirectory):
 
 
 
-# Check command line argument for pass/fail
-if len(sys.argv) < 2 or sys.argv[1] not in ("pass", "fail"):
-    print("Usage: python makeFallbackFont.py [pass|fail]")
+# Check command line argument for ift/fail
+if len(sys.argv) < 2 or sys.argv[1] not in ("ift", "fallback"):
+    print("Usage: python makeFallbackFont.py [ift|fallback]")
     sys.exit(1)
 
 mode = sys.argv[1]
 
+if (mode == "ift"):
+    file_descriptor = "fallback";
+elif (mode == "fallback"):
+    file_descriptor = "";
 # Input and output files
 input_font_path = TTFSourcePath
 subset_font_path = os.path.join(fallbackDirectory, "Roboto-subset.ttf")
-final_font_path = os.path.join(fallbackDirectory, f"Roboto-{mode}.ttf")
+final_font_path = os.path.join(fallbackDirectory, f"Roboto{file_descriptor}.ttf")
 
 # Step 1: Subset the font to keep only required glyphs
 glyphs_to_keep = ["A", "F", "I", "L", "P", "S"]
@@ -69,7 +73,7 @@ if "GSUB" not in font:
 
 
 # Determine mapping based on command line argument
-if mode == "pass":
+if mode == "ift":
     fea_code = """
 feature liga {
     sub P by P A S S;

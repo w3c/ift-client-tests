@@ -21,8 +21,9 @@ import os
 import shutil
 import glob
 import zipfile
+from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory
+                          clientTestResourcesDirectory, IFTTestDirectory, IFTSourcePath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 
 # ------------------
@@ -168,17 +169,48 @@ def writeTest(identifier, title, description, data, specLink=None, credits=[], s
     )
 
 
-def makeDSIG():
-    return b'\x00\x01\x00\x00\x00\x0c\x44\x53\x49\x47\x00\x00\x00\x08'
+def makeFormat3IFT():
+    if not os.path.exists(IFTTestDirectory):
+        os.makedirs(IFTTestDirectory)
+
+    test_name = "conform-format1-valid-format-number"
+    test_directory = os.path.join(IFTTestDirectory, test_name)
+    if not os.path.exists(test_directory):
+        os.makedirs(test_directory)
+
+    # Copy _gk and _tk files from resources/IFT/ to test_directory
+    source_dir = os.path.join(resourcesDirectory, "IFT")
+    for pattern in ("*_gk", "*_tk"):
+        for file_path in glob.glob(os.path.join(source_dir, pattern)):
+            shutil.copy(file_path, test_directory)
+            print(f"Copied {file_path} to {test_directory}")
+
+    outPath = os.path.join(test_directory, "myfont-mod.ift.otf");
+    font = TTFont(IFTSourcePath)
+
+    if "IFT " not in font:
+        raise ValueError("IFT table not found in font.")
+
+    # Unknown/custom tables are stored as raw bytes on .data
+    tbl = font["IFT "]
+    raw = bytearray(tbl.data)
+
+    # The first byte is the 'format' (uint8). Set it to 3.
+    raw[0] = 3
+
+    # Put the bytes back and save
+    tbl.data = bytes(raw)
+    # return b'\x00\x01\x00\x00\x00\x0c\x44\x53\x49\x47\x00\x00\x00\x08'
+    return tbl.data
 
 writeTest(
     identifier="tabledata-dsig-001",
-    title="CFF SFNT With DSIG Table",
-    description="The CFF flavored SFNT has a DSIG table. (Note: this is not a valid DSIG. It should not be used for testing anything other than the presence of the table after the conversion process.) The process of converting to WOFF should remove the DSIG table.",
+    title="Format 1 with valid format number",
+    description="The IFT table 'format' field is set to 3, which is a invalid format number.",
     shouldConvert=True,
-    credits=[dict(title="Khaled Hosny", role="author", link="http://khaledhosny.org")],
-    specLink="#conform-mustRemoveDSIG",
-    data=makeDSIG()
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#conform-format1-valid-format-number",
+    data=makeFormat3IFT()
 )
 
 # ------------------

@@ -34,6 +34,10 @@ fontsDirectory = os.path.join(mainDirectory, "client","fonts")
 IFTTestDirectory = os.path.join(fontsDirectory, "IFT")
 fallbackDirectory = os.path.join(fontsDirectory, "fallback")
 
+clientDirectory = os.path.join(mainDirectory, "Client")
+clientTestDirectory = os.path.join(clientDirectory, "Tests", "xhtml1")
+clientTestResourcesDirectory = os.path.join(clientTestDirectory, "resources")
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()

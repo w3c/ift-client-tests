@@ -462,7 +462,7 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
     ]
     # add a download note
     html_string.append("\t\t<div class=\"mainNote\">")
-    html_string.append("\t\t\tThe files used in these test can be obtained individually <a href=\"../xhtml1\">here</a> or as a single zip file <a href=\"AuthoringToolTestFonts.zip\">here</a>.")
+    html_string.append("\t\t\tThe files used in these test can be obtained individually <a href=\"../xhtml1\">here</a> or as a single zip file <a href=\"ClientTestFonts.zip\">here</a>.")
     html_string.append("\t\t</div>")
     # add the note
     if note:
@@ -558,7 +558,7 @@ def generateDecoderIndexHTML(directory=None, testCases=[], note=None):
     ]
     # add a download note
     html_string.append("\t\t<div class=\"mainNote\">")
-    html_string.append("\t\t\tThe files used in these test can be obtained individually <a href=\"../xhtml1\">here</a> or as a single zip file <a href=\"AuthoringToolTestFonts.zip\">here</a>.")
+    html_string.append("\t\t\tThe files used in these test can be obtained individually <a href=\"../xhtml1\">here</a> or as a single zip file <a href=\"ClientTestFonts.zip\">here</a>.")
     html_string.append("\t\t</div>")
     # add the note
     if note:

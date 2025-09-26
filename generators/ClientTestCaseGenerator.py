@@ -49,11 +49,16 @@ if os.path.exists(destPath):
 shutil.copy(os.path.join(resourcesDirectory, "index.css"), destPath)
 
 # brotli JS
-destPath = os.path.join(clientTestResourcesDirectory, "brotli.js")
+destPath = os.path.join(clientTestResourcesDirectory,"cc-client")
 if os.path.exists(destPath):
-    os.remove(destPath)
-shutil.copy(os.path.join(resourcesDirectory, "cc-client","brotli.js"), destPath)
+    shutil.rmtree(destPath)
+shutil.copytree(os.path.join(resourcesDirectory, "cc-client"), destPath)
 
+# rust client
+destPath = os.path.join(clientTestResourcesDirectory,"rust-client")
+if os.path.exists(destPath):
+    shutil.rmtree(destPath)
+shutil.copytree(os.path.join(resourcesDirectory, "rust-client"), destPath)
 # ---------------
 # Test Case Index
 # ---------------

@@ -191,8 +191,6 @@ def makeFormat3IFT():
 
     # Put the bytes back and save
     tbl.data = bytes(raw)
-    # return b'\x00\x01\x00\x00\x00\x0c\x44\x53\x49\x47\x00\x00\x00\x08'
-    return tbl.data
 
 writeTest(
     identifier="tabledata-dsig-001",

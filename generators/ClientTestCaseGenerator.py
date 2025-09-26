@@ -48,6 +48,12 @@ if os.path.exists(destPath):
     os.remove(destPath)
 shutil.copy(os.path.join(resourcesDirectory, "index.css"), destPath)
 
+# fonts css
+destPath = os.path.join(clientTestResourcesDirectory, "fonts.css")
+if os.path.exists(destPath):
+    os.remove(destPath)
+shutil.copy(os.path.join(resourcesDirectory, "fonts.css"), destPath)
+
 # brotli JS
 destPath = os.path.join(clientTestResourcesDirectory,"cc-client")
 if os.path.exists(destPath):
@@ -94,7 +100,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldConvert=False, flavor="CFF"):
+def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldShowIFT=False, flavor="CFF"):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -120,7 +126,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
         role="author or reviewer",
         link="mailto:email or http://contactpage"
 
-    shouldConvert: A boolean indicating if the SFNT is valid enough for
+    shouldShowIFT: A boolean indicating if the SFNT is valid enough for
     conversion to WOFF.
 
     flavor: The flavor of the WOFF data. The options are CFF or TTF.
@@ -143,7 +149,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
             identifier=identifier,
             title=title,
             description=description,
-            shouldConvert=shouldConvert,
+            shouldShowIFT=shouldShowIFT,
             specLink=specLink
         )
     )
@@ -183,7 +189,7 @@ writeTest(
     identifier="conform-format1-valid-format-number",
     title="Format 2 with valid format number",
     description="The IFT table 'format' field is set to 3, which is a invalid format number.",
-    shouldConvert=True,
+    shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format1-valid-format-number",
     func=makeFormat3IFT

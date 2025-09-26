@@ -105,7 +105,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, data, specLink=None, credits=[], shouldConvert=False, flavor="CFF"):
+def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldConvert=False, flavor="CFF"):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -137,6 +137,7 @@ def writeTest(identifier, title, description, data, specLink=None, credits=[], s
     flavor: The flavor of the WOFF data. The options are CFF or TTF.
     """
     print("Compiling %s..." % identifier)
+    func()
     assert identifier not in registeredIdentifiers, "Duplicate identifier! %s" % identifier
     assert title not in registeredTitles, "Duplicate title! %s" % title
     assert description not in registeredDescriptions, "Duplicate description! %s" % description
@@ -145,22 +146,6 @@ def writeTest(identifier, title, description, data, specLink=None, credits=[], s
     registeredDescriptions.add(description)
 
     specLink = expandSpecLinks(specLink)
-
-    # generate the SFNT
-    sfntPath = os.path.join(clientTestDirectory, identifier)
-    if flavor == "CFF":
-        sfntPath += ".otf"
-    elif flavor == "TTF":
-        sfntPath += ".ttf"
-    elif flavor == "TTC":
-        sfntPath += ".ttc"
-    elif flavor == "OTC":
-        sfntPath += ".otc"
-    else:
-        assert False, "Unknown flavor: %s" % flavor
-    f = open(sfntPath, "wb")
-    f.write(data)
-    f.close()
 
     # register the test
     tag = identifier.split("-")[0]
@@ -216,7 +201,7 @@ writeTest(
     shouldConvert=True,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format1-valid-format-number",
-    data=makeFormat3IFT()
+    func=makeFormat3IFT
 )
 
 # ------------------

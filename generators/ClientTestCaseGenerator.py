@@ -240,11 +240,16 @@ if os.path.exists(zipPath):
 
 allBinariesZip = zipfile.ZipFile(zipPath, "w")
 
-pattern = os.path.join(clientTestDirectory, "*.?t?")
-for path in glob.glob(pattern):
-    ext = os.path.splitext(path)[1]
-    assert ext in (".otf", ".ttf", ".otc", ".ttc")
-    allBinariesZip.write(path, os.path.basename(path))
+# Add directories that start with 'conform-'
+conform_pattern = os.path.join(clientTestDirectory, "conform-*")
+for dir_path in glob.glob(conform_pattern):
+    if os.path.isdir(dir_path):
+        dir_name = os.path.basename(dir_path)
+        for root, dirs, files in os.walk(dir_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                archive_path = os.path.join(dir_name, os.path.relpath(file_path, dir_path))
+                allBinariesZip.write(file_path, archive_path)
 
 allBinariesZip.close()
 

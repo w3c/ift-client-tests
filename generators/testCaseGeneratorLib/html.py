@@ -456,6 +456,9 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
         "\t\t<style type=\"text/css\">",
         "\t\t\t@import \"resources/index.css\";",
         "\t\t</style>",
+        "\t\t<style type=\"text/css\">",
+        "\t\t\t@import \"resources/fonts.css\";",
+        "\t\t</style>",
         "\t</head>",
         "\t<body>",
         "\t\t<h1>Incremental Font Transfer: Client Test Suite (%d tests)</h1>" % testCount,
@@ -491,11 +494,11 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
             title = html.escape(title)
             description = test["description"]
             description = html.escape(description)
-            shouldConvert = test["shouldConvert"]
-            if shouldConvert:
-                shouldConvert = "Yes"
+            shouldShowIFT = test["shouldShowIFT"]
+            if shouldShowIFT:
+                shouldShowIFT = "P"
             else:
-                shouldConvert = "No"
+                shouldShowIFT = "F"
             specLink = test["specLink"]
             # start the test case div
             html_string.append("\t\t<div class=\"testCase\" id=\"%s\">" % identifier)
@@ -510,7 +513,7 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
             # start the details div
             html_string.append("\t\t\t<div class=\"testCaseDetails\">")
             # validity
-            string = "Should Convert to WOFF: <span id=\"%s-shouldconvert\">%s</span>" % (identifier, shouldConvert)
+            string = "Should Render IFT: <span id=\"%s-shouldrender\">%s</span>" % (identifier, shouldShowIFT)
             html_string.append("\t\t\t\t\t<p>%s</p>" % string)
             # documentation
             if specLink is not None:

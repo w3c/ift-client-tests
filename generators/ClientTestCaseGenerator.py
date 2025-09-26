@@ -161,8 +161,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
     )
 
 
-def makeFormat3IFT():
-    test_name = "conform-format1-valid-format-number"
+def makeFormat3IFTWithFormatID(format_id, test_name):
     test_directory = os.path.join(clientTestResourcesDirectory, test_name)
     if not os.path.exists(test_directory):
         os.makedirs(test_directory)
@@ -185,20 +184,29 @@ def makeFormat3IFT():
     raw = bytearray(tbl.data)
 
     # The first byte is the 'format' (uint8). Set it to 3.
-    raw[0] = 3
+    raw[0] = format_id
 
     # Put the bytes back and save
     tbl.data = bytes(raw)
     font.save(outPath)
 
 writeTest(
-    identifier="conform-format1-valid-format-number",
+    identifier="conform-format2-valid-format-number",
     title="Format 2 with valid format number",
-    description="The IFT table 'format' field is set to 3, which is a invalid format number.",
+    description="The IFT table 'format' field for a format 2 is set to 3, which is a invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format1-valid-format-number",
-    func=makeFormat3IFT
+    func=lambda: makeFormat3IFTWithFormatID(3,"conform-format2-valid-format-number")
+)
+writeTest(
+    identifier="conform-format1-valid-format-number",
+    title="Format 1 with valid format number",
+    description="The IFT table 'format' field for a format 1 is set to 3, which is a invalid format number.",
+    shouldShowIFT=True,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#conform-format2-valid-format-number",
+    func=lambda: makeFormat3IFTWithFormatID(2,"conform-format1-valid-format-number")
 )
 
 # ------------------

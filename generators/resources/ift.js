@@ -24,7 +24,6 @@ async function update_all_fonts() {
       console.error(`Error updating font for ${test_name}:`, e);
       continue; // Skip to the next element
     }
-    console.log('Found result element:', el);
   }
 }
 

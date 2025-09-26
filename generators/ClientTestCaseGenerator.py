@@ -48,6 +48,12 @@ if os.path.exists(destPath):
     os.remove(destPath)
 shutil.copy(os.path.join(resourcesDirectory, "index.css"), destPath)
 
+# brotli JS
+destPath = os.path.join(clientTestResourcesDirectory, "brotli.js")
+if os.path.exists(destPath):
+    os.remove(destPath)
+shutil.copy(os.path.join(resourcesDirectory, "cc-client","brotli.js"), destPath)
+
 # ---------------
 # Test Case Index
 # ---------------

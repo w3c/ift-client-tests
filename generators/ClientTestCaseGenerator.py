@@ -121,7 +121,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
 
     description: A detailed statement about what the test case is proving.
 
-    func: The function that generates the IFT files.
+    func: The function that generates the IFT files specific for the test.
 
     specLink: The anchor in the WOFF spec that the test case is testing.
 
@@ -161,7 +161,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
     )
 
 
-def makeFormat3IFTWithFormatID(format_id, test_name):
+def makeIFTWithFormatID(format_id, test_name):
     test_directory = os.path.join(clientTestDirectory, test_name)
     if not os.path.exists(test_directory):
         os.makedirs(test_directory)
@@ -197,7 +197,7 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format1-valid-format-number",
-    func=lambda: makeFormat3IFTWithFormatID(3,"conform-format2-valid-format-number")
+    func=lambda: makeIFTWithFormatID(3,"conform-format2-valid-format-number")
 )
 writeTest(
     identifier="conform-format1-valid-format-number",
@@ -206,7 +206,7 @@ writeTest(
     shouldShowIFT=True,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format2-valid-format-number",
-    func=lambda: makeFormat3IFTWithFormatID(2,"conform-format1-valid-format-number")
+    func=lambda: makeIFTWithFormatID(2,"conform-format1-valid-format-number")
 )
 
 # ------------------

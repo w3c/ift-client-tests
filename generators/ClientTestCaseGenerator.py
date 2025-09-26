@@ -289,19 +289,3 @@ if os.path.exists(path):
 f = open(path, "w")
 f.write("\n".join(manifest))
 f.close()
-
-# -----------------------
-# Check for Unknown Files
-# -----------------------
-
-otfPattern = os.path.join(clientTestDirectory, "*.otf")
-ttfPattern = os.path.join(clientTestDirectory, "*.ttf")
-otcPattern = os.path.join(clientTestDirectory, "*.otc")
-ttcPattern = os.path.join(clientTestDirectory, "*.ttc")
-filesOnDisk = glob.glob(otfPattern) + glob.glob(ttfPattern) + glob.glob(otcPattern) + glob.glob(ttcPattern)
-
-for path in filesOnDisk:
-    identifier = os.path.basename(path)
-    identifier = identifier.split(".")[0]
-    if identifier not in registeredIdentifiers:
-        print("Unknown file:", path)

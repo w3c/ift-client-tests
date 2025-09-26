@@ -162,7 +162,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
 
 
 def makeFormat3IFTWithFormatID(format_id, test_name):
-    test_directory = os.path.join(clientTestResourcesDirectory, test_name)
+    test_directory = os.path.join(clientTestDirectory, test_name)
     if not os.path.exists(test_directory):
         os.makedirs(test_directory)
 

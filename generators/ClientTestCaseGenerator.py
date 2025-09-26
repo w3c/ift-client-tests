@@ -63,33 +63,17 @@ shutil.copy(os.path.join(resourcesDirectory, "cc-client","brotli.js"), destPath)
 # all of the tests have been written.
 
 indexNote = """
-The tests in this suite represent SFNT data to be used for WOFF
-conversion without any alteration or correction. An authoring tool
-may allow the explicit or silent modification and/or correction of
-SFNT data. In such a case, the tests in this suite that are labeled
-as "should not convert" may be converted, so long as the problems
-in the files have been corrected. In that case, there is no longer
-any access to the "input font" as defined in the WOFF specification,
-so the bitwise identical tests should be skipped.
+index note
 """.strip()
 
-tableDataNote = """
-These files are valid SFNTs that excercise conversion of the table data.
-""".strip()
 
-tableDirectoryNote = """
-These files are valid SFNTs that excercise conversion of the table directory.
-""".strip()
-
-collectionNote = """
-These files are valid SFNTs that excercise conversion of font collections.
+clientNote = """
+client note
 """.strip()
 
 groupDefinitions = [
     # identifier, title, spec section, category note
-    ("tabledirectory", "SFNT Table Directory Tests", expandSpecLinks("#DataTables"), tableDirectoryNote),
-    ("tabledata", "SFNT Table Data Tests", expandSpecLinks("#DataTables"), tableDataNote),
-    ("collection", "SFNT Collection Tests", expandSpecLinks("#DataTables"), collectionNote),
+    ("conform", "Client Conformance Tests", expandSpecLinks("#DataTables"), clientNote),
 ]
 
 testRegistry = {}
@@ -120,7 +104,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
 
     description: A detailed statement about what the test case is proving.
 
-    data: The complete binary data for the SFNT.
+    func: The function that generates the IFT files.
 
     specLink: The anchor in the WOFF spec that the test case is testing.
 
@@ -161,11 +145,8 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
 
 
 def makeFormat3IFT():
-    if not os.path.exists(IFTTestDirectory):
-        os.makedirs(IFTTestDirectory)
-
     test_name = "conform-format1-valid-format-number"
-    test_directory = os.path.join(IFTTestDirectory, test_name)
+    test_directory = os.path.join(clientTestResourcesDirectory, test_name)
     if not os.path.exists(test_directory):
         os.makedirs(test_directory)
 
@@ -191,10 +172,11 @@ def makeFormat3IFT():
 
     # Put the bytes back and save
     tbl.data = bytes(raw)
+    font.save(outPath)
 
 writeTest(
-    identifier="tabledata-dsig-001",
-    title="Format 1 with valid format number",
+    identifier="conform-format1-valid-format-number",
+    title="Format 2 with valid format number",
     description="The IFT table 'format' field is set to 3, which is a invalid format number.",
     shouldConvert=True,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],

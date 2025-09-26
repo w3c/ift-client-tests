@@ -459,6 +459,13 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
         "\t\t<style type=\"text/css\">",
         "\t\t\t@import \"resources/fonts.css\";",
         "\t\t</style>",
+        "\t\t<script type=\"text/javascript\" src=\"resources/cc-client/brotli.js\"></script>",
+        "\t\t<script type=\"module\" src=\"resources/ift.js\"></script>",
+        "\t\t<script>",
+        "    createModule().then(function (Module) {",
+        "      window.Woff2Decoder = Module.Woff2Decoder;",
+        "    });",
+        "  </script>",
         "\t</head>",
         "\t<body>",
         "\t\t<h1>Incremental Font Transfer: Client Test Suite (%d tests)</h1>" % testCount,
@@ -513,7 +520,7 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
             # start the details div
             html_string.append("\t\t\t<div class=\"testCaseDetails\">")
             # validity
-            string = "Should Render IFT: <span id=\"%s-shouldrender\">%s</span>" % (identifier, shouldShowIFT)
+            string = "Should Render IFT: <span id=\"%s\" class=\"result\">%s</span>" % (identifier, shouldShowIFT)
             html_string.append("\t\t\t\t\t<p>%s</p>" % string)
             # documentation
             if specLink is not None:
@@ -609,7 +616,7 @@ def generateDecoderIndexHTML(directory=None, testCases=[], note=None):
             # start the details div
             html_string.append("\t\t\t<div class=\"testCaseDetails\">")
             # validity
-            string = "Round-Trip Test: <span id=\"%s-shouldconvert\">%s</span>" % (identifier, roundTrip)
+            string = "Round-Trip Test: <span id=\"%s-shouldconvert\" class=\"result\">%s</span>" % (identifier, roundTrip)
             html_string.append("\t\t\t\t\t<p>%s</p>" % string)
             # documentation
             if specLink is not None:

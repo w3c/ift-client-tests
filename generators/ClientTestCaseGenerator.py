@@ -54,6 +54,12 @@ if os.path.exists(destPath):
     os.remove(destPath)
 shutil.copy(os.path.join(resourcesDirectory, "fonts.css"), destPath)
 
+# ift js
+destPath = os.path.join(clientTestResourcesDirectory, "ift.js")
+if os.path.exists(destPath):
+    os.remove(destPath)
+shutil.copy(os.path.join(resourcesDirectory, "ift.js"), destPath)
+
 # brotli JS
 destPath = os.path.join(clientTestResourcesDirectory,"cc-client")
 if os.path.exists(destPath):
@@ -208,6 +214,11 @@ for tag, title, url, note in groupDefinitions:
     testGroups.append(group)
 
 generateClientIndexHTML(directory=clientTestDirectory, testCases=testGroups, note=indexNote)
+
+destPath = os.path.join(clientTestDirectory, "index.html")
+if os.path.exists(destPath):
+    os.remove(destPath)
+shutil.copy(os.path.join(clientTestDirectory, "testcaseindex.xht"), destPath)
 
 # ----------------
 # Generate the zip

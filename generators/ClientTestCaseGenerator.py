@@ -71,6 +71,12 @@ destPath = os.path.join(clientTestResourcesDirectory,"rust-client")
 if os.path.exists(destPath):
     shutil.rmtree(destPath)
 shutil.copytree(os.path.join(resourcesDirectory, "rust-client"), destPath)
+
+# fallback font
+destPath = os.path.join(clientTestResourcesDirectory,"fallback")
+if os.path.exists(destPath):
+    shutil.rmtree(destPath)
+shutil.copytree(os.path.join(resourcesDirectory, "fallback"), destPath)
 # ---------------
 # Test Case Index
 # ---------------

@@ -199,7 +199,7 @@ def makeIFTWithFormatID(format_id, test_name):
 writeTest(
     identifier="conform-format2-valid-format-number",
     title="Format 2 with valid format number",
-    description="The IFT table 'format' field for a format 2 is set to 3, which is a invalid format number.",
+    description="The IFT table 'format' field for a format 2 is set to 3, which is an invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format2-valid-format-number",
@@ -208,7 +208,7 @@ writeTest(
 writeTest(
     identifier="conform-format1-valid-format-number",
     title="Format 1 with valid format number",
-    description="The IFT table 'format' field for a format 1 is set to 3, which is a invalid format number.",
+    description="The IFT table 'format' field for a format 1 is set to 3, which is an invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format1-valid-format-number",

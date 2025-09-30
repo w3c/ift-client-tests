@@ -202,7 +202,7 @@ writeTest(
     description="The IFT table 'format' field for a format 2 is set to 3, which is a invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink="#conform-format1-valid-format-number",
+    specLink="#conform-format2-valid-format-number",
     func=lambda: makeIFTWithFormatID(3,"conform-format2-valid-format-number")
 )
 writeTest(
@@ -211,7 +211,7 @@ writeTest(
     description="The IFT table 'format' field for a format 1 is set to 3, which is a invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink="#conform-format2-valid-format-number",
+    specLink="#conform-format1-valid-format-number",
     func=lambda: makeIFTWithFormatID(2,"conform-format1-valid-format-number")
 )
 

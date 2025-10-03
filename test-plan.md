@@ -9,10 +9,14 @@ These tests will take the same appraoch as the [WOFF2 conformance tests](https:/
 where specially crafted HTML and font combinations will be used to probe the user agent's IFT client side implementation.
 
 For example, let's say we needed to check that the user agent correctly rejects a IFT font that contains invalid data.
-The test file would have some text which is configured to irst use an IFT font to render it, and then as a fallback a
+The test file would have some text which is configured to first use an IFT font to render it, and then as a fallback a
 non-incremental font. The IFT font is modified to be invalid. The non-incremental font is modified to display a "PASS"
 glyph when rendering the sample text. If the user agent is implemented correctly it will fail to use the IFT font and
 fallback to the non-incremental font.  As a result a PASS glyph will be displayed.
+
+Since no browsers currently implement IFT, as a temporary work around a javascript polyfill built from the
+[fontations IFT client](https://github.com/googlefonts/fontations/tree/main/incremental-font-transfer) will be utilized.
+Once, browser support becomes available we can rework the framework to no longer rely on the polyfill.
 
 # Test Case Plans
 

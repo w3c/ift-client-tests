@@ -31,6 +31,9 @@ class ConformanceStatementFinder(HTMLParser):
     if "conform" not in attr_map["class"]:
       return
 
+    if "client" not in attr_map["class"]:
+      return
+
     self.conformance_ids.add(attr_map["id"])
 
   def handle_endtag(self, tag):
@@ -73,10 +76,8 @@ def tested_conformance_ids(tested_ids_path):
     tested_ids_text = tested_ids_file.readlines()
 
   ids = set()
-  line_start = "tested conformance id: "
   for line in tested_ids_text:
-    if line.startswith(line_start):
-      ids.add(line[len(line_start):-1])
+    ids.add(line[:-1])
 
   return ids
 

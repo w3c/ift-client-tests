@@ -203,7 +203,7 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#conform-format2-valid-format-number",
-    func=lambda: makeIFTWithFormatID(3,"conform-format2-valid-format-number")
+    func=lambda: makeIFTWithFormatID(3,"client-conform-format2-valid-format-number")
 )
 
 # ------------------

@@ -112,16 +112,14 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldShowIFT=False, flavor="CFF"):
+def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldShowIFT=False):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
 
     identifier: The identifier for the test case. The identifier must be
     a - separated sequence of group name (from the groupDefinitions
-    listed above), test case description (arbitrary length) and a number
-    to make the name unique. The number should be zero padded to a length
-    of three characters (ie "001" instead of "1").
+    listed above), and test case description (arbitrary length).
 
     title: A thorough, but not too long, title for the test case.
 
@@ -141,7 +139,6 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
     shouldShowIFT: A boolean indicating if the SFNT is valid enough for
     conversion to WOFF.
 
-    flavor: The flavor of the WOFF data. The options are CFF or TTF.
     """
     print("Compiling %s..." % identifier)
     func()

@@ -96,7 +96,7 @@ client note
 
 groupDefinitions = [
     # identifier, title, spec section, category note
-    ("conform", "Client Conformance Tests", expandSpecLinks("#DataTables"), clientNote),
+    ("client", "Client Conformance Tests", expandSpecLinks("#DataTables"), clientNote),
 ]
 
 testRegistry = {}
@@ -197,7 +197,7 @@ def makeIFTWithFormatID(format_id, test_name):
     font.save(outPath)
 
 writeTest(
-    identifier="conform-format2-valid-format-number",
+    identifier="client-conform-format2-valid-format-number",
     title="Format 2 with valid format number",
     description="The IFT table 'format' field for a format 2 is set to 3, which is an invalid format number.",
     shouldShowIFT=False,

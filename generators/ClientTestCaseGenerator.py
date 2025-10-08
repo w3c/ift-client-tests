@@ -1,20 +1,22 @@
 """
-This script generates the authoring tool test cases. It will create a directory
-one level up from the directory containing this script called "AuthoringTool".
+This script generates the IFT client test cases. It will create a directory
+one level up from the directory containing this script called "IFTClient".
 That directory will have the structure:
 
     /Format
-        README.txt - information about how the tests were generated and how they should be modified
         /Tests
-            testcaseindex.xht - index of all test cases
-            test-case-name-number.otf/ttf - individual SFNT test case
-            /resources
-                index.css - index CSS file
+            /xhtml1
+                testcaseindex.xht - index of all test cases
+                /resources
+                    fonts.css - css for font samples
+                    ift.js - IFT assigner
+                    index.css - page style sheet
+                    /rust-client - RUST client
+                    /cc-client - Brotli compression library
+                    /fallback - fallback fonts
 
 Within this script, each test case is generated with a call to the
-writeTest function. In this, SFNT data must be passed along with
-details about the data. This function will generate the SFNT
-and register the case in the suite index.
+writeTest function.
 """
 
 import os

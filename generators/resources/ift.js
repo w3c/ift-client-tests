@@ -60,9 +60,6 @@ function patch_codepoints(font_id, font_face, cps, features, axes) {
   }
   let state = states[font_id];
 
-  // TODO(garretrieger): check return values of add_* methods and don't update the font
-  //                     if no changes are made.
-
   for (const [tag, point] of axes) {
     state.add_design_space_to_target_subset_definition(tag, point, point);
   }
@@ -75,20 +72,6 @@ function patch_codepoints(font_id, font_face, cps, features, axes) {
   return state.current_font_subset(woff2_decoder).then(font => {
     const font_data = new Uint8Array(window.ift_memory.buffer, font.data(), font.len());
     let descriptor = {};
-    if (font_id.includes("Roboto")) {
-      descriptor = {
-        weight: "100 900",
-        stretch: "75% 100%"
-      };
-    } else if (font_id.includes("NotoSerif")) {
-      descriptor = {
-        weight: "900",
-      };
-    } else if (font_id.includes("NotoSans")) {
-      descriptor = {
-        weight: "100 900",
-      };
-    }
     font = new FontFace(font_face, font_data, descriptor);
     return font.load();
   })

@@ -195,16 +195,18 @@ def makeIFTWithFormatID(format_id, test_name):
     tbl.data = bytes(raw)
     font.save(outPath)
 
-testTag = "conform-format2-valid-format-number"
 testType = "client"
+
+testTag = "conform-format2-valid-format-number"
+identifierString= "%s-%s" % (testType, testTag)
 writeTest(
-    identifier= "%s-%s" % (testType, testTag),
+    identifier=identifierString,
     title="Format 2 with invalid format number",
     description="The IFT table 'format' field for a format 2 is set to 3, which is an invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink= "#%s-%s" % (testType, testTag),
-    func=lambda: makeIFTWithFormatID(3,"%s-%s" % (testType, testTag))
+    specLink= "#%s" % identifierString,
+    func=lambda: makeIFTWithFormatID(3, identifierString) 
 )
 
 # ------------------

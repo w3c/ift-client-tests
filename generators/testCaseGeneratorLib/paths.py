@@ -26,12 +26,10 @@ mainDirectory = dirname(mainDirectory, 2)
 # directory for SFNT data, test case templates,
 resourcesDirectory = os.path.join(mainDirectory, "generators", "resources")
 # paths to specific resources
-TTFSourcePath = os.path.join(resourcesDirectory, "fallback", "Roboto-Regular.ttf")
 IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "myfont.ift.ttf")
 
 # directories for test output
 fontsDirectory = os.path.join(mainDirectory, "client","fonts")
-IFTTestDirectory = os.path.join(fontsDirectory, "IFT")
 fallbackDirectory = os.path.join(fontsDirectory, "fallback")
 
 clientDirectory = os.path.join(mainDirectory, "IFTClient")

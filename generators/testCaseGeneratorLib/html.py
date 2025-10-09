@@ -520,7 +520,9 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
             # start the details div
             html_string.append("\t\t\t<div class=\"testCaseDetails\">")
             # validity
-            string = "Should Render IFT: <span id=\"%s\" class=\"result\">%s</span>" % (identifier, shouldShowIFT)
+            
+            render_text = "Should Render IFT" if shouldShowIFT != "F" else "Should Not Render IFT"
+            string = "%s: <span id=\"%s\" class=\"result\">%s</span>" % (render_text, identifier, shouldShowIFT)
             html_string.append("\t\t\t\t\t<p>%s</p>" % string)
             # documentation
             if specLink is not None:

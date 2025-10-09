@@ -3,7 +3,7 @@ This script generates the IFT client test cases. It will create a directory
 one level up from the directory containing this script called "IFTClient".
 That directory will have the structure:
 
-    /Format
+    /IFTClient
         /Tests
             /xhtml1
                 testcaseindex.xht - index of all test cases

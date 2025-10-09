@@ -25,7 +25,7 @@ import glob
 import zipfile
 from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, IFTTestDirectory, IFTSourcePath
+                          clientTestResourcesDirectory, IFTSourcePath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 
 # ------------------

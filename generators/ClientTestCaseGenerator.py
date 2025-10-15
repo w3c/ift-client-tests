@@ -20,8 +20,9 @@ writeTest function.
 """
 
 import os
-import shutil
 import glob
+import shutil
+import struct
 import zipfile
 from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
@@ -209,6 +210,70 @@ writeTest(
     func=lambda: makeIFTWithFormatID(3, identifierString) 
 )
 
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name):
+    test_directory = os.path.join(clientTestDirectory, test_name)
+    if not os.path.exists(test_directory):
+        os.makedirs(test_directory)
+
+    # Copy _gk and _tk files from resources/IFT/ to test_directory
+    source_dir = os.path.join(resourcesDirectory, "IFT")
+    for pattern in ("*_gk", "*_tk"):
+        for file_path in glob.glob(os.path.join(source_dir, pattern)):
+            shutil.copy(file_path, test_directory)
+            print(f"Copied {file_path} to {test_directory}")
+
+    outPath = os.path.join(test_directory, "myfont-mod.ift.otf");
+    font = TTFont(IFTSourcePath)
+    iftTable = font['IFT ']
+    iftData = bytearray(iftTable.data)
+    # Header
+    entriesOffset = int.from_bytes(iftData[25:29], "big")
+    entriesData = iftData[entriesOffset:]
+    offset = 0
+
+    # First Mapping Entry
+    formatFlags = entriesData[offset]
+    offset += 1
+
+    hasFeature = formatFlags & 0b00000001
+
+    if hasFeature:
+        # featureCount + featureTags
+        featureCount = entriesData[offset]
+        offset += 1
+        offset += featureCount * 4  # skip featureTags
+
+        # designSpaceCount
+        designSpaceCount = int.from_bytes(entriesData[offset:offset+2], "big")
+        offset += 2
+
+        if designSpaceCount > 0:
+            # first Design Space Segment
+            segmentOffset = offset
+            # skip tag (4) + start (4)
+            endOffset = segmentOffset + 8
+
+            # set end to invalid value
+            invalidEndFixed = int(-1 * (1 << 16))  # negative 16.16 fixed
+            entriesData[endOffset:endOffset+4] = struct.pack(">i", invalidEndFixed)
+
+    # Write back
+    iftData[entriesOffset:entriesOffset+len(entriesData)] = entriesData
+    iftTable.data = bytes(iftData)
+
+    font.save(outPath)
+
+testTag = "conform-design-space-segment-end-invalid-value"
+identifierString= "%s-%s" % (testType, testTag)
+writeTest(
+    identifier=identifierString,
+    title="Format 2 with invalid design space segment end value",
+    description="The IFT table design space segment end value is set to an invalid negative number.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink= "#%s" % identifierString,
+    func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString) 
+)
 # ------------------
 # Generate the Index
 # ------------------

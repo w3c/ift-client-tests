@@ -210,13 +210,14 @@ writeTest(
     func=lambda: makeIFTWithFormatID(3, identifierString) 
 )
 
-def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name):
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name): 
+    #TODO: need to create IFT from variable font!
     test_directory = os.path.join(clientTestDirectory, test_name)
     if not os.path.exists(test_directory):
         os.makedirs(test_directory)
 
     # Copy _gk and _tk files from resources/IFT/ to test_directory
-    source_dir = os.path.join(resourcesDirectory, "IFT")
+    source_dir = os.path.join(resourcesDirectory, "IFTVariable")
     for pattern in ("*_gk", "*_tk"):
         for file_path in glob.glob(os.path.join(source_dir, pattern)):
             shutil.copy(file_path, test_directory)
@@ -236,7 +237,7 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name):
     offset += 1
 
     hasFeature = formatFlags & 0b00000001
-
+    print("hasFeature", hasFeature)
     if hasFeature:
         # featureCount + featureTags
         featureCount = entriesData[offset]

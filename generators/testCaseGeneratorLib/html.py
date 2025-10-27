@@ -13,7 +13,6 @@ from testCaseGeneratorLib.paths import clientTestResourcesDirectory
 # ------------------------
 
 specificationURL = "https://www.w3.org/TR/IFT/";
-woff1SpecificationURL = "http://www.w3.org/TR/WOFF/"
 
 # -------------------
 # Do not edit warning
@@ -654,8 +653,7 @@ def generateDecoderIndexHTML(directory=None, testCases=[], note=None):
 def expandSpecLinks(links):
     """
     This function expands anchor-only references to fully qualified spec links.
-    #name expands to <woff2specurl>#name. woff1:#name expands to
-    <woff1specurl>#name.
+    #name expands to <iftspecurl>#name. 
 
     links: 0..N space-separated #anchor references
     """
@@ -664,10 +662,7 @@ def expandSpecLinks(links):
 
     specLinks = []
     for link in links.split(" "):
-        if link.startswith("woff1:"):
-            link = woff1SpecificationURL + link[6:]
-        else:
-            link = specificationURL + link
+        link = specificationURL + link
 
         specLinks.append(link)
 

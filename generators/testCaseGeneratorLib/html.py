@@ -76,7 +76,6 @@ def _generateSFNTDisplayTestHTML(
     fileName=None, refFileName=None, flavor=None,
     title=None, specLinks=[], assertion=None,
     credits=[], flags=[],
-    metadataToDisplay=None,
     extraSFNTNotes=[],
     extraMetadataNotes=[],
     chapterURL=None
@@ -149,13 +148,6 @@ def _generateSFNTDisplayTestHTML(
     ## test case
     s = "\t\t<div class=\"test\">%s</div>" % bodyCharacter
     html_string.append(s)
-    ## show metadata
-    if metadataToDisplay:
-        s = "\t\t<p>The XML contained in the Extended Metadata Block is below.</p>"
-        html_string.append(s)
-        html_string.append("\t\t<pre>")
-        html_string.append(html.escape(metadataToDisplay))
-        html_string.append("\t\t</pre>")
     ## close
     html_string.append("\t</body>")
     # close
@@ -168,7 +160,7 @@ def generateSFNTDisplayTestHTML(
     fileName=None, directory=None, flavor=None, title=None,
     sfntDisplaySpecLink=None, metadataDisplaySpecLink=None, assertion=None,
     credits=[], flags=[],
-    shouldDisplay=None, metadataToDisplay=None,
+    shouldDisplay=None, 
     extraSFNTNotes=[], extraMetadataNotes=[],
     chapterURL=None
     ):
@@ -191,7 +183,6 @@ def generateSFNTDisplayTestHTML(
         specLinks=specLinks,
         assertion=assertion,
         credits=credits, flags=flags,
-        metadataToDisplay=metadataToDisplay,
         extraSFNTNotes=extraSFNTNotes,
         extraMetadataNotes=extraMetadataNotes,
         chapterURL=chapterURL
@@ -206,7 +197,7 @@ def generateSFNTDisplayRefHTML(
         fileName=None, directory=None, flavor=None, title=None,
         sfntDisplaySpecLink=None, metadataDisplaySpecLink=None,
         assertion=None, credits=[], flags=[],
-        shouldDisplay=None, metadataToDisplay=None,
+        shouldDisplay=None,
         extraSFNTNotes=[], extraMetadataNotes=[],
         chapterURL=None
     ):
@@ -224,7 +215,6 @@ def generateSFNTDisplayRefHTML(
         specLinks=specLinks,
         assertion=assertion,
         credits=credits, flags=flags,
-        metadataToDisplay=metadataToDisplay,
         extraSFNTNotes=extraSFNTNotes,
         extraMetadataNotes=extraMetadataNotes,
         chapterURL=chapterURL

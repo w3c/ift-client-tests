@@ -76,7 +76,6 @@ def _generateSFNTDisplayTestHTML(
     fileName=None, refFileName=None, flavor=None,
     title=None, specLinks=[], assertion=None,
     credits=[], flags=[],
-    metadataIsValid=None,
     metadataToDisplay=None,
     extraSFNTNotes=[],
     extraMetadataNotes=[],
@@ -140,16 +139,6 @@ def _generateSFNTDisplayTestHTML(
     # body
     html_string.append("\t<body>")
     ## note
-    if metadataIsValid is None:
-        s = "\t\t<p>Test passes if the word PASS appears below.</p>"
-    else:
-        if not metadataIsValid:
-            s = "\t\t<p>If the UA does not display WOFF metadata, the test passes if the word PASS appears below.</p>\n"
-            s += "\t\t<p>The Extended Metadata Block is not valid and must not be displayed. If the UA does display it, the test fails.</p>"
-        else:
-            s = "\t\t<p>Test passes if the word PASS appears below.</p>\n"
-            s += "\t\t<p>The Extended Metadata Block is valid and may be displayed to the user upon request.</p>"
-    html_string.append(s)
     # extra notes
     for note in extraSFNTNotes:
         s = "\t\t<p>%s</p>" % html.escape(note)
@@ -179,7 +168,7 @@ def generateSFNTDisplayTestHTML(
     fileName=None, directory=None, flavor=None, title=None,
     sfntDisplaySpecLink=None, metadataDisplaySpecLink=None, assertion=None,
     credits=[], flags=[],
-    shouldDisplay=None, metadataIsValid=None, metadataToDisplay=None,
+    shouldDisplay=None, metadataToDisplay=None,
     extraSFNTNotes=[], extraMetadataNotes=[],
     chapterURL=None
     ):
@@ -202,7 +191,6 @@ def generateSFNTDisplayTestHTML(
         specLinks=specLinks,
         assertion=assertion,
         credits=credits, flags=flags,
-        metadataIsValid=metadataIsValid,
         metadataToDisplay=metadataToDisplay,
         extraSFNTNotes=extraSFNTNotes,
         extraMetadataNotes=extraMetadataNotes,
@@ -218,7 +206,7 @@ def generateSFNTDisplayRefHTML(
         fileName=None, directory=None, flavor=None, title=None,
         sfntDisplaySpecLink=None, metadataDisplaySpecLink=None,
         assertion=None, credits=[], flags=[],
-        shouldDisplay=None, metadataIsValid=None, metadataToDisplay=None,
+        shouldDisplay=None, metadataToDisplay=None,
         extraSFNTNotes=[], extraMetadataNotes=[],
         chapterURL=None
     ):
@@ -236,7 +224,6 @@ def generateSFNTDisplayRefHTML(
         specLinks=specLinks,
         assertion=assertion,
         credits=credits, flags=flags,
-        metadataIsValid=metadataIsValid,
         metadataToDisplay=metadataToDisplay,
         extraSFNTNotes=extraSFNTNotes,
         extraMetadataNotes=extraMetadataNotes,

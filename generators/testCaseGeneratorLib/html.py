@@ -77,7 +77,6 @@ def _generateSFNTDisplayTestHTML(
     title=None, specLinks=[], assertion=None,
     credits=[], flags=[],
     extraSFNTNotes=[],
-    extraMetadataNotes=[],
     chapterURL=None
     ):
     assert flavor is not None
@@ -142,9 +141,6 @@ def _generateSFNTDisplayTestHTML(
     for note in extraSFNTNotes:
         s = "\t\t<p>%s</p>" % html.escape(note)
         html_string.append(s)
-    for note in extraMetadataNotes:
-        s = "\t\t<p>%s</p>" % html.escape(note)
-        html_string.append(s)
     ## test case
     s = "\t\t<div class=\"test\">%s</div>" % bodyCharacter
     html_string.append(s)
@@ -161,7 +157,7 @@ def generateSFNTDisplayTestHTML(
     sfntDisplaySpecLink=None, metadataDisplaySpecLink=None, assertion=None,
     credits=[], flags=[],
     shouldDisplay=None, 
-    extraSFNTNotes=[], extraMetadataNotes=[],
+    extraSFNTNotes=[], 
     chapterURL=None
     ):
     bodyCharacter = testFailCharacter
@@ -184,7 +180,6 @@ def generateSFNTDisplayTestHTML(
         assertion=assertion,
         credits=credits, flags=flags,
         extraSFNTNotes=extraSFNTNotes,
-        extraMetadataNotes=extraMetadataNotes,
         chapterURL=chapterURL
     )
     # write the file
@@ -198,7 +193,7 @@ def generateSFNTDisplayRefHTML(
         sfntDisplaySpecLink=None, metadataDisplaySpecLink=None,
         assertion=None, credits=[], flags=[],
         shouldDisplay=None,
-        extraSFNTNotes=[], extraMetadataNotes=[],
+        extraSFNTNotes=[], 
         chapterURL=None
     ):
     bodyCharacter = refPassCharacter
@@ -216,7 +211,6 @@ def generateSFNTDisplayRefHTML(
         assertion=assertion,
         credits=credits, flags=flags,
         extraSFNTNotes=extraSFNTNotes,
-        extraMetadataNotes=extraMetadataNotes,
         chapterURL=chapterURL
     )
     # write the file

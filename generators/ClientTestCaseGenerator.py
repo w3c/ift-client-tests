@@ -171,24 +171,6 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
         )
     )
 
-def copyIFTSourceToTestDirectory(testName):
-    testDirectory = os.path.join(clientTestDirectory, testName)
-    if not os.path.exists(testDirectory):
-        os.makedirs(testDirectory)
-
-    # Copy _gk and _tk files from resources/IFT/ to testDirectory
-    sourceDir = os.path.join(resourcesDirectory, "IFT")
-    for pattern in ("*_gk", "*_tk"):
-        for filePath in glob.glob(os.path.join(sourceDir, pattern)):
-            shutil.copy(filePath, testDirectory)
-            print(f"Copied {filePath} to {testDirectory}")
-
-    return testDirectory
-
-def writeTestIFTFile(font, testDirectory):
-    outPath = os.path.join(testDirectory, "myfont-mod.ift.otf")
-    font.save(outPath)
-
 class NFTFile:
     def __init__(self, testName):
         self.testName = testName 

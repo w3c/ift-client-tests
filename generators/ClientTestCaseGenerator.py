@@ -32,6 +32,7 @@ from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 # IFT Table Header Offsets 
 IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29
+IFT_FORMAT_OFFSET = 0
 
 # ------------------
 # Directory Creation
@@ -223,7 +224,7 @@ class NFTFile:
 def makeIFTWithFormatID(formatId, testName):
     nft = NFTFile(testName)
     raw = nft.getIFTTableData()
-    raw[0] = formatId
+    raw[IFT_FORMAT_OFFSET] = formatId
     nft.writeTestIFTFile()
 
 testType = "client"

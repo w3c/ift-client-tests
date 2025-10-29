@@ -184,9 +184,12 @@ def copyIFTSourceToTestDirectory(testName):
 
     return testDirectory
 
+def writeTestIFTFile(font, testDirectory):
+    outPath = os.path.join(testDirectory, "myfont-mod.ift.otf")
+    font.save(outPath)
+
 def makeIFTWithFormatID(formatId, testName):
     testDirectory = copyIFTSourceToTestDirectory(testName)
-    outPath = os.path.join(testDirectory, "myfont-mod.ift.otf");
     font = TTFont(IFTSourcePath)
 
     if "IFT " not in font:
@@ -201,7 +204,7 @@ def makeIFTWithFormatID(formatId, testName):
 
     # Put the bytes back and save
     tbl.data = bytes(raw)
-    font.save(outPath)
+    writeTestIFTFile(font, testDirectory)
 
 testType = "client"
 
@@ -220,7 +223,6 @@ writeTest(
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
     #TODO: need to create IFT from variable font!
     testDirectory = copyIFTSourceToTestDirectory(testName)
-    outPath = os.path.join(testDirectory, "myfont-mod.ift.otf")
     font = TTFont(IFTSourcePath)
     iftTable = font['IFT ']
     iftData = bytearray(iftTable.data)
@@ -259,8 +261,7 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
     # Write back
     iftData[entriesOffset:entriesOffset+len(entriesData)] = entriesData
     iftTable.data = bytes(iftData)
-
-    font.save(outPath)
+    writeTestIFTFile(font, testDirectory)
 
 testTag = "conform-design-space-segment-end-invalid-value"
 identifierString= "%s-%s" % (testType, testTag)

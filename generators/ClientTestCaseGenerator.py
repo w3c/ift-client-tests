@@ -166,8 +166,7 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
         )
     )
 
-
-def makeIFTWithFormatID(format_id, test_name):
+def copyIFTSourceToTestDirectory(test_name):
     test_directory = os.path.join(clientTestDirectory, test_name)
     if not os.path.exists(test_directory):
         os.makedirs(test_directory)
@@ -179,6 +178,10 @@ def makeIFTWithFormatID(format_id, test_name):
             shutil.copy(file_path, test_directory)
             print(f"Copied {file_path} to {test_directory}")
 
+    return test_directory
+    
+def makeIFTWithFormatID(format_id, test_name):
+    test_directory = copyIFTSourceToTestDirectory(test_name)
     outPath = os.path.join(test_directory, "myfont-mod.ift.otf");
     font = TTFont(IFTSourcePath)
 
@@ -212,18 +215,8 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name): 
     #TODO: need to create IFT from variable font!
-    test_directory = os.path.join(clientTestDirectory, test_name)
-    if not os.path.exists(test_directory):
-        os.makedirs(test_directory)
-
-    # Copy _gk and _tk files from resources/IFT/ to test_directory
-    source_dir = os.path.join(resourcesDirectory, "IFTVariable")
-    for pattern in ("*_gk", "*_tk"):
-        for file_path in glob.glob(os.path.join(source_dir, pattern)):
-            shutil.copy(file_path, test_directory)
-            print(f"Copied {file_path} to {test_directory}")
-
-    outPath = os.path.join(test_directory, "myfont-mod.ift.otf");
+    test_directory = copyIFTSourceToTestDirectory(test_name)
+    outPath = os.path.join(test_directory, "myfont-mod.ift.otf")
     font = TTFont(IFTSourcePath)
     iftTable = font['IFT ']
     iftData = bytearray(iftTable.data)

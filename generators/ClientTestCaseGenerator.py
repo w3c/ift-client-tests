@@ -170,23 +170,23 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
         )
     )
 
-def copyIFTSourceToTestDirectory(test_name):
-    test_directory = os.path.join(clientTestDirectory, test_name)
-    if not os.path.exists(test_directory):
-        os.makedirs(test_directory)
+def copyIFTSourceToTestDirectory(testName):
+    testDirectory = os.path.join(clientTestDirectory, testName)
+    if not os.path.exists(testDirectory):
+        os.makedirs(testDirectory)
 
-    # Copy _gk and _tk files from resources/IFT/ to test_directory
-    source_dir = os.path.join(resourcesDirectory, "IFT")
+    # Copy _gk and _tk files from resources/IFT/ to testDirectory
+    sourceDir = os.path.join(resourcesDirectory, "IFT")
     for pattern in ("*_gk", "*_tk"):
-        for file_path in glob.glob(os.path.join(source_dir, pattern)):
-            shutil.copy(file_path, test_directory)
-            print(f"Copied {file_path} to {test_directory}")
+        for filePath in glob.glob(os.path.join(sourceDir, pattern)):
+            shutil.copy(filePath, testDirectory)
+            print(f"Copied {filePath} to {testDirectory}")
 
-    return test_directory
-    
-def makeIFTWithFormatID(format_id, test_name):
-    test_directory = copyIFTSourceToTestDirectory(test_name)
-    outPath = os.path.join(test_directory, "myfont-mod.ift.otf");
+    return testDirectory
+
+def makeIFTWithFormatID(formatId, testName):
+    testDirectory = copyIFTSourceToTestDirectory(testName)
+    outPath = os.path.join(testDirectory, "myfont-mod.ift.otf");
     font = TTFont(IFTSourcePath)
 
     if "IFT " not in font:
@@ -197,7 +197,7 @@ def makeIFTWithFormatID(format_id, test_name):
     raw = bytearray(tbl.data)
 
     # The first byte is the 'format' (uint8). Set it to 3.
-    raw[0] = format_id
+    raw[0] = formatId
 
     # Put the bytes back and save
     tbl.data = bytes(raw)
@@ -217,10 +217,10 @@ writeTest(
     func=lambda: makeIFTWithFormatID(3, identifierString) 
 )
 
-def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name): 
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
     #TODO: need to create IFT from variable font!
-    test_directory = copyIFTSourceToTestDirectory(test_name)
-    outPath = os.path.join(test_directory, "myfont-mod.ift.otf")
+    testDirectory = copyIFTSourceToTestDirectory(testName)
+    outPath = os.path.join(testDirectory, "myfont-mod.ift.otf")
     font = TTFont(IFTSourcePath)
     iftTable = font['IFT ']
     iftData = bytearray(iftTable.data)
@@ -305,15 +305,15 @@ if os.path.exists(zipPath):
 allBinariesZip = zipfile.ZipFile(zipPath, "w")
 
 # Add directories that start with 'conform-'
-conform_pattern = os.path.join(clientTestDirectory, "conform-*")
-for dir_path in glob.glob(conform_pattern):
-    if os.path.isdir(dir_path):
-        dir_name = os.path.basename(dir_path)
-        for root, dirs, files in os.walk(dir_path):
+conformPattern = os.path.join(clientTestDirectory, "conform-*")
+for dirPath in glob.glob(conformPattern):
+    if os.path.isdir(dirPath):
+        dirName = os.path.basename(dirPath)
+        for root, dirs, files in os.walk(dirPath):
             for file in files:
-                file_path = os.path.join(root, file)
-                archive_path = os.path.join(dir_name, os.path.relpath(file_path, dir_path))
-                allBinariesZip.write(file_path, archive_path)
+                filePath = os.path.join(root, file)
+                archive_path = os.path.join(dirName, os.path.relpath(filePath, dirPath))
+                allBinariesZip.write(filePath, archive_path)
 
 allBinariesZip.close()
 

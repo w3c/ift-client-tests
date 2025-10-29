@@ -29,6 +29,10 @@ from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clie
                           clientTestResourcesDirectory, IFTSourcePath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 
+# IFT Table Header Offsets 
+IFT_ENTRIES_OFFSET_START = 25
+IFT_ENTRIES_OFFSET_END = 29
+
 # ------------------
 # Directory Creation
 # (if needed)
@@ -221,7 +225,8 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(test_name):
     iftTable = font['IFT ']
     iftData = bytearray(iftTable.data)
     # Header
-    entriesOffset = int.from_bytes(iftData[25:29], "big")
+
+    entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
     entriesData = iftData[entriesOffset:]
     offset = 0
 

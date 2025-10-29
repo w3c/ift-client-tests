@@ -242,11 +242,8 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    testDirectory = copyIFTSourceToTestDirectory(testName)
-    font = TTFont(IFTSourcePath)
-    iftTable = font['IFT ']
-    iftData = bytearray(iftTable.data)
-    # Header
+    nft = NFTFile(testName)
+    iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
     entriesData = iftData[entriesOffset:]
@@ -279,9 +276,7 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
             entriesData[endOffset:endOffset+4] = struct.pack(">i", invalidEndFixed)
 
     # Write back
-    iftData[entriesOffset:entriesOffset+len(entriesData)] = entriesData
-    iftTable.data = bytes(iftData)
-    writeTestIFTFile(font, testDirectory)
+    nft.writeTestIFTFile()
 
 testTag = "conform-design-space-segment-end-invalid-value"
 identifierString= "%s-%s" % (testType, testTag)

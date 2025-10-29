@@ -188,23 +188,43 @@ def writeTestIFTFile(font, testDirectory):
     outPath = os.path.join(testDirectory, "myfont-mod.ift.otf")
     font.save(outPath)
 
+class NFTFile:
+    def __init__(self, testName):
+        self.testName = testName 
+        self.testDirectory = os.path.join(clientTestDirectory, testName)
+        self.createTestDirectory()
+        self.copyIFTSourceFiles()
+    def createTestDirectory(self):
+        if not os.path.exists(self.testDirectory):
+            os.makedirs(self.testDirectory)
+    def copyIFTSourceFiles(self):
+        # Copy _gk and _tk files from resources/IFT/ to testDirectory
+        sourceDir = os.path.join(resourcesDirectory, "IFT")
+        for pattern in ("*_gk", "*_tk"):
+            for filePath in glob.glob(os.path.join(sourceDir, pattern)):
+                shutil.copy(filePath, self.testDirectory)
+                print(f"Copied {filePath} to {self.testDirectory}")
+    def getIFTTableData(self):
+        self.font = TTFont(IFTSourcePath)
+        if "IFT " not in self.font:
+            raise ValueError("IFT table not found in font.")
+        # Unknown/custom tables are stored as raw bytes on .data
+        self.tbl = self.font["IFT "]
+        self.raw = bytearray(self.tbl.data)
+        return self.raw
+    def writeTestIFTFile(self):
+        if self.tbl and self.raw:
+            self.tbl.data = bytes(self.raw)
+        outPath = os.path.join(self.testDirectory, "myfont-mod.ift.otf")
+        self.font.save(outPath)
+    
+
+# start of tests
 def makeIFTWithFormatID(formatId, testName):
-    testDirectory = copyIFTSourceToTestDirectory(testName)
-    font = TTFont(IFTSourcePath)
-
-    if "IFT " not in font:
-        raise ValueError("IFT table not found in font.")
-
-    # Unknown/custom tables are stored as raw bytes on .data
-    tbl = font["IFT "]
-    raw = bytearray(tbl.data)
-
-    # The first byte is the 'format' (uint8). Set it to 3.
+    nft = NFTFile(testName)
+    raw = nft.getIFTTableData()
     raw[0] = formatId
-
-    # Put the bytes back and save
-    tbl.data = bytes(raw)
-    writeTestIFTFile(font, testDirectory)
+    nft.writeTestIFTFile()
 
 testType = "client"
 

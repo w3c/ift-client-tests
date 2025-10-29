@@ -221,7 +221,7 @@ writeTest(
 )
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
-    #TODO: need to create IFT from variable font!
+    # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
     testDirectory = copyIFTSourceToTestDirectory(testName)
     font = TTFont(IFTSourcePath)
     iftTable = font['IFT ']

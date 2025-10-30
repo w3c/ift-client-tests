@@ -44,11 +44,15 @@ To compile a particular test suite, simply run the relevant script:
 To generate the subsetted fonts files needed for these tests, you can run the following command:
 
 For the fallback font:
+
     >>>python makeSubsettedFont.py fallback
+    
 (this will generate a font file that substitutes the `p` glyph with `fail` and the `f` glyph with `pass`)
 
 For the font that will be used as the source for the IFT:
+
     >>>python makeSubsettedFont.py IFT
+
 (this will generate a font file that substitutes the `f` glyph with `fail` and the `p` glyph with `pass`)
 
 The fallback font can be used as-is and the IFT source font can be used with the IFT encoder (https://github.com/w3c/ift-encoder) to create an IFT font. 

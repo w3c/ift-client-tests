@@ -29,18 +29,14 @@ test results visually in IFT client tests.
 
 import os
 import sys
-from testCaseGeneratorLib.paths import TTFSourcePath, fallbackDirectory
+from testCaseGeneratorLib.paths import subsetFontPath, TTFSourcePath
 from fontTools.ttLib import TTFont, newTable
 from fontTools.subset import Subsetter, Options
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 
 # Ensure output directory exists
-if not os.path.exists(fallbackDirectory):
-    os.makedirs(fallbackDirectory)
-
-
-
-
+if not os.path.exists(subsetFontPath):
+    os.makedirs(subsetFontPath)
 
 # Parse and validate command line arguments
 if len(sys.argv) < 2 or sys.argv[1] not in ("ift", "fallback"):
@@ -57,8 +53,8 @@ elif mode == "fallback":
 
 # Configure input and output file paths
 input_font_path = TTFSourcePath
-subset_font_path = os.path.join(fallbackDirectory, "Roboto-subset.ttf")
-final_font_path = os.path.join(fallbackDirectory, f"Roboto{file_descriptor}.ttf")
+subset_font_path = os.path.join(subsetFontPath, "Roboto-subset.ttf")
+final_font_path = os.path.join(subsetFontPath, f"Roboto{file_descriptor}.ttf")
 
 # Step 1: Create subset font containing only required glyphs
 # Only keep glyphs needed for test words "PASS" and "FAIL"

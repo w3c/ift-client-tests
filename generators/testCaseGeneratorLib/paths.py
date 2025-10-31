@@ -23,11 +23,14 @@ def dirname(path, depth=1):
 mainDirectory = dirname(__file__)
 mainDirectory = dirname(mainDirectory, 2)
 
-# directory for SFNT data, test case templates,
+# directory for test case resources,
 resourcesDirectory = os.path.join(mainDirectory, "generators", "resources")
 # paths to specific resources
 IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "myfont.ift.ttf")
-
+# directory for source font file
+TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","source.ttf") 
+# directory for subsetted font files
+subsetFontPath = os.path.join(mainDirectory,"generators","subsettedFonts") 
 # directories for test output
 fontsDirectory = os.path.join(mainDirectory, "client","fonts")
 fallbackDirectory = os.path.join(fontsDirectory, "fallback")

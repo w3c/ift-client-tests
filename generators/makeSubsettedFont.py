@@ -45,16 +45,10 @@ if len(sys.argv) < 2 or sys.argv[1] not in ("ift", "fallback"):
 
 mode = sys.argv[1]
 
-# Determine file naming based on mode
-if mode == "ift":
-    file_descriptor = "fallback" 
-elif mode == "fallback":
-    file_descriptor = ""
-
 # Configure input and output file paths
 input_font_path = TTFSourcePath
 subset_font_path = os.path.join(subsetFontPath, "Roboto-subset.ttf")
-final_font_path = os.path.join(subsetFontPath, f"Roboto{file_descriptor}.ttf")
+final_font_path = os.path.join(subsetFontPath, f"Roboto{mode}.ttf")
 
 # Step 1: Create subset font containing only required glyphs
 # Only keep glyphs needed for test words "PASS" and "FAIL"

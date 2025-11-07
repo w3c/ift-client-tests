@@ -14,7 +14,7 @@ fonts/roboto/Roboto-IFT.woff2: build/Roboto-Preprocessed.ttf config/roboto_segme
 	bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
 		--input_font=$(CURDIR)/build/Roboto-Preprocessed.ttf \
 		--plan=$(CURDIR)/config/roboto_segmentation_plan.txtpb \
-		--output_path=$(CURDIR)/fonts/roboto \
+		--output_path=$(CURDIR)/../generators/resources/IFT \
 		--output_font="myfont.ift.ttf"
 
 build/Roboto-Preprocessed.ttf: ../generators/subsettedFonts/Robotoift.ttf
@@ -34,3 +34,4 @@ config/roboto_segmentation_plan.txtpb: build/Roboto-Preprocessed.ttf config/robo
 clean: 
 	rm -f build/*
 	rm -rf fonts/*
+	rm -rf ../generators/resources/IFT/*

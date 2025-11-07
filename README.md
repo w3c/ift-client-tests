@@ -51,7 +51,7 @@ For the fallback font:
 
 For the font that will be used as the source for the IFT:
 
-    >>>python makeSubsettedFont.py IFT
+    >>>python makeSubsettedFont.py ift
 
 (this will generate a font file that substitutes the `f` glyph with `fail` and the `p` glyph with `pass`)
 

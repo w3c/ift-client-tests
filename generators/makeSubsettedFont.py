@@ -47,9 +47,9 @@ mode = sys.argv[1]
 
 # Determine file naming based on mode
 if mode == "ift":
-    file_descriptor = "fallback"  # Creates "RobotoFallback.ttf"
+    file_descriptor = "fallback" 
 elif mode == "fallback":
-    file_descriptor = ""          # Creates "RobotoFallbackFallback.ttf"
+    file_descriptor = ""
 
 # Configure input and output file paths
 input_font_path = TTFSourcePath

@@ -37,7 +37,7 @@ Client tests have the following dependencies:
 * Bazel https://bazel.build/install
 * C++ compiler (gcc/clang)
 
-The test cases here are generated as follows:
+The test cases are generated as follows:
 
 Create the fallback font:
 

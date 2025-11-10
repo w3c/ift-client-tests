@@ -31,7 +31,7 @@ conformance statements are not covered.
 
 ## Generate Client Tests
 
-Client tests are dependent on the following package:
+Client tests have the following dependencies:
 
 * FontTools https://github.com/behdad/fonttools
 * Bazel https://bazel.build/install
@@ -39,7 +39,7 @@ Client tests are dependent on the following package:
 
 The test cases here are generated as follows:
 
-For the fallback font:
+Create the fallback font:
 
 ```bash
 # From the repository root
@@ -47,9 +47,11 @@ ift-client-tests$ cd generators
 ift-client-tests/generators$ python makeSubsettedFont.py fallback
 ```
 
-(this will generate a font file that substitutes the `p` glyph with `fail` and the `f` glyph with `pass`)
+glyph normally used for the letter “F” is substituted with the glyph sequence that renders the word “FAIL,”
 
-For the font that will be used as the source for the IFT:
+(this will generate a font file that substitutes the letter `P` with the glyph sequence `FAIL` and the letter `F` with the glyph sequence `PASS`)
+
+Create the source font for the IFT:
 
 ```bash
 # From the repository root
@@ -57,9 +59,9 @@ ift-client-tests$ cd generators
 ift-client-tests/generators$ python makeSubsettedFont.py ift
 ```
 
-(this will generate a font file that substitutes the `f` glyph with `fail` and the `p` glyph with `pass`)
+(this will generate a font file that substitutes the letter `P` with the glyph sequence `PASS` and the letter `F` with the glyph sequence `FAIL`)
 
-To encode the subsetted IFT font:
+To encode the subsetted IFT from the IFT source font:
 
 ```bash
 # From the repository root

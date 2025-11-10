@@ -47,8 +47,6 @@ ift-client-tests$ cd generators
 ift-client-tests/generators$ python makeSubsettedFont.py fallback
 ```
 
-glyph normally used for the letter “F” is substituted with the glyph sequence that renders the word “FAIL,”
-
 (this will generate a font file that substitutes the letter `P` with the glyph sequence `FAIL` and the letter `F` with the glyph sequence `PASS`)
 
 Create the source font for the IFT:

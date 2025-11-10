@@ -31,9 +31,11 @@ conformance statements are not covered.
 
 ## Generate Client Tests
 
-The scripts are dependent on the following package:
+Client tests are dependent on the following package:
 
 * FontTools https://github.com/behdad/fonttools
+* Bazel https://bazel.build/install
+* C++ compiler (gcc/clang)
 
 The test cases here are generated as follows:
 

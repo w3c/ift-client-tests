@@ -31,8 +31,12 @@ IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "myfont.ift.ttf")
 TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","source.ttf") 
 # directory for subsetted font files
 subsetFontPath = os.path.join(mainDirectory,"generators","subsettedFonts") 
+# fallback font path
+fallbackFontPath = os.path.join(subsetFontPath, "Robotofallback.ttf")
 # directories for test output
 fontsDirectory = os.path.join(mainDirectory, "client","fonts")
+# directory for subset fonts
+subsetDirectory = os.path.join(mainDirectory,"generators", "subsettedFonts")
 fallbackDirectory = os.path.join(fontsDirectory, "fallback")
 
 clientDirectory = os.path.join(mainDirectory, "IFTClient")

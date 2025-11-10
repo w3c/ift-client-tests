@@ -26,7 +26,7 @@ import struct
 import zipfile
 from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, IFTSourcePath
+                          clientTestResourcesDirectory, IFTSourcePath, fallbackFontPath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 
 # IFT Table Header Offsets 
@@ -86,7 +86,9 @@ shutil.copytree(os.path.join(resourcesDirectory, "rust-client"), destPath)
 destPath = os.path.join(clientTestResourcesDirectory,"fallback")
 if os.path.exists(destPath):
     shutil.rmtree(destPath)
-shutil.copytree(os.path.join(resourcesDirectory, "fallback"), destPath)
+os.makedirs(destPath)
+shutil.copy(fallbackFontPath, os.path.join(destPath, "Roboto.ttf"))
+
 # ---------------
 # Test Case Index
 # ---------------

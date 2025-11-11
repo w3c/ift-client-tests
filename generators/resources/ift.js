@@ -7,7 +7,7 @@ async function update_all_fonts() {
   for (let el of resultElements) {
     let test_name = el.id;
     let rndNum = Math.floor(Math.random() * 100000); // to break caching
-    let title_font = `${test_name}/myfont-mod.ift.otf?v=${rndNum}`;
+    let title_font = `${test_name}/myfont-mod.ift.woff2?v=${rndNum}`;
     let title_text = document.getElementById(test_name).innerText;
     let font_name = test_name + " IFT Font";
     // check to see if element contains pass or fail class

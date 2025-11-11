@@ -26,7 +26,7 @@ mainDirectory = dirname(mainDirectory, 2)
 # directory for test case resources,
 resourcesDirectory = os.path.join(mainDirectory, "generators", "resources")
 # paths to specific resources
-IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "myfont.ift.ttf")
+IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "myfont.ift.woff2")
 # directory for source font file
 TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","source.ttf") 
 # directory for subsetted font files

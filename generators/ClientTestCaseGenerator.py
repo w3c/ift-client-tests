@@ -34,7 +34,7 @@ IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29
 IFT_FORMAT_OFFSET = 0
 # Other constants
-IFT_FONT_FILENAME = "myfont-mod.ift.otf"
+IFT_FONT_FILENAME = "myfont-mod.ift.woff2"
 
 # ------------------
 # Directory Creation

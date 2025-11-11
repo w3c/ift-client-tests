@@ -2,7 +2,7 @@
 """
 Subsetting Font Generator for IFT Client Tests
 
-This script creates subset test fonts from a source TTF font for use in 
+This script creates subset test fonts from a source font file for use in 
 Incremental Font Transfer (IFT) client testing. It generates fonts with 
 specific glyph substitution rules to test client behavior.
 
@@ -10,18 +10,24 @@ The script:
 1. Subsets the input font to keep only required glyphs (A, F, I, L, P, S)
 2. Adds OpenType GSUB ligature features based on the specified mode
 3. Renames the font family to reflect its purpose
-4. Saves the processed font to the fallback directory
+4. Saves the processed font to the output directory
 
 Usage:
-    python makeSubsettedFont.py [ift|fallback]
+    python makeSubsettedFont.py <input_font> <mode>
 
 Arguments:
-    ift        - Creates a font where P→PASS and F→FAIL (for IFT success tests)
-    fallback   - Creates a font where P→FAIL and F→PASS (for fallback tests)
+    input_font - Path to the source font file (TTF, OTF, WOFF, WOFF2, etc.)
+    mode       - Either 'ift' or 'fallback'
+                 ift:      Creates a font where P→PASS and F→FAIL (for IFT success tests)
+                 fallback: Creates a font where P→FAIL and F→PASS (for fallback tests)
 
 Output:
-    - ift mode: Creates "RobotoFallback.ttf" 
-    - fallback mode: Creates "RobotoFallbackFallback.ttf"
+    The output font will be saved in the subsettedFonts directory,
+    with the mode appended to the base filename (preserving the original extension).
+
+Examples:
+    python makeSubsettedFont.py ../fonts/Roboto-Regular.ttf ift
+    python makeSubsettedFont.py ../fonts/MyFont.otf fallback
 
 The generated fonts use OpenType ligature substitutions to display
 test results visually in IFT client tests.
@@ -29,7 +35,7 @@ test results visually in IFT client tests.
 
 import os
 import sys
-from testCaseGeneratorLib.paths import subsetFontPath, TTFSourcePath
+from testCaseGeneratorLib.paths import subsetFontPath
 from fontTools.ttLib import TTFont, newTable
 from fontTools.subset import Subsetter, Options
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -39,16 +45,27 @@ if not os.path.exists(subsetFontPath):
     os.makedirs(subsetFontPath)
 
 # Parse and validate command line arguments
-if len(sys.argv) < 2 or sys.argv[1] not in ("ift", "fallback"):
-    print("Usage: python makeSubsettedFont.py [ift|fallback]")
+if len(sys.argv) < 3 or sys.argv[2] not in ("ift", "fallback"):
+    print("Usage: python makeSubsettedFont.py <input_font> <mode>")
+    print("  input_font: Path to the source font file")
+    print("  mode: 'ift' or 'fallback'")
     sys.exit(1)
 
-mode = sys.argv[1]
+input_font_path = sys.argv[1]
+mode = sys.argv[2]
 
-# Configure input and output file paths
-input_font_path = TTFSourcePath
-subset_font_path = os.path.join(subsetFontPath, "Roboto-subset.ttf")
-final_font_path = os.path.join(subsetFontPath, f"Roboto{mode}.ttf")
+# Validate input file exists
+if not os.path.exists(input_font_path):
+    print(f"Error: Input font file not found: {input_font_path}")
+    sys.exit(1)
+
+# Extract base filename and extension
+base_name = os.path.splitext(os.path.basename(input_font_path))[0]
+extension = os.path.splitext(input_font_path)[1]
+
+# Configure output file paths
+subset_font_path = os.path.join(subsetFontPath, f"{base_name}-subset{extension}")
+final_font_path = os.path.join(subsetFontPath, f"{base_name}{mode.capitalize()}{extension}")
 
 # Step 1: Create subset font containing only required glyphs
 # Only keep glyphs needed for test words "PASS" and "FAIL"

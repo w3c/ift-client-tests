@@ -299,6 +299,7 @@ writeTest(
     specLink= "#%s" % identifierString,
     func=lambda: removeIFTTable(identifierString) 
 )
+
 # ------------------
 # Generate the Index
 # ------------------

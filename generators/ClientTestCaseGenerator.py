@@ -176,9 +176,10 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
     )
 
 class NFTFile:
-    def __init__(self, testName):
+    def __init__(self, testName,sourceFontPath):
         self.testName = testName 
         self.testDirectory = os.path.join(clientTestDirectory, testName)
+        self.sourceFontPath = sourceFontPath
         self.createTestDirectory()
         self.copyIFTSourceFiles()
     def createTestDirectory(self):
@@ -192,7 +193,7 @@ class NFTFile:
                 shutil.copy(filePath, self.testDirectory)
                 print(f"Copied {filePath} to {self.testDirectory}")
     def getIFTTableData(self):
-        self.font = TTFont(IFTSourcePath)
+        self.font = TTFont(self.sourceFontPath)
         if "IFT " not in self.font:
             raise ValueError("IFT table not found in font.")
         # Unknown/custom tables are stored as raw bytes on .data
@@ -212,7 +213,7 @@ class NFTFile:
 
 # start of tests
 def makeIFTWithFormatID(formatId, testName):
-    nft = NFTFile(testName)
+    nft = NFTFile(testName,IFTSourcePath)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
     nft.setIFTTableData(bytes(raw))
@@ -234,7 +235,7 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = NFTFile(testName)
+    nft = NFTFile(testName,IFTSourcePath)
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -283,7 +284,7 @@ writeTest(
 )
 
 def removeIFTTable(testName):
-    nft = NFTFile(testName)
+    nft = NFTFile(testName,IFTSourcePath)
     raw = nft.getIFTTableData()
     nft.removeIFTTable()
     nft.writeTestIFTFile()

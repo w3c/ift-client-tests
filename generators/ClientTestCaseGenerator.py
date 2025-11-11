@@ -241,7 +241,6 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
     offset += 1
 
     hasFeature = formatFlags & 0b00000001
-    print("hasFeature", hasFeature)
     if hasFeature:
         # featureCount + featureTags
         featureCount = entriesData[offset]

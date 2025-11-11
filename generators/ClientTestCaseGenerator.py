@@ -201,6 +201,8 @@ class NFTFile:
         return self.raw
     def setIFTTableData(self, data):
         self.raw = bytearray(data)
+    def removeIFTTable(self):
+        del self.font["IFT "]
     def writeTestIFTFile(self):
         if self.tbl and self.raw:
             self.tbl.data = bytes(self.raw)
@@ -278,6 +280,24 @@ writeTest(
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
     func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString) 
+)
+
+def removeIFTTable(testName):
+    nft = NFTFile(testName)
+    raw = nft.getIFTTableData()
+    nft.removeIFTTable()
+    nft.writeTestIFTFile()
+
+testTag = "conform-require-ift-table"
+identifierString= "%s-%s" % (testType, testTag)
+writeTest(
+    identifier=identifierString,
+    title="IFT table missing",
+    description="All incremental fonts must contain the 'IFT ' table.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink= "#%s" % identifierString,
+    func=lambda: removeIFTTable(identifierString) 
 )
 # ------------------
 # Generate the Index

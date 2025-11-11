@@ -53,7 +53,7 @@ def makeSubsettedFont(sourceFontPath,mode):
     fileName = os.path.basename(sourceFontPath)
     fileNameWithoutExt, ext = os.path.splitext(fileName)
     # Configure input and output file paths
-    subsetFont = os.path.join(subsetFontPath, fileNameWithoutExt + "-subset"+ext)
+    subsetFont = os.path.join(subsetFontPath, f"{fileNameWithoutExt}-subset{ext}")
     finalFontPath = os.path.join(subsetFontPath, f"Roboto{mode.capitalize()}.ttf")
 
 

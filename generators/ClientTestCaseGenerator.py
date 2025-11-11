@@ -213,6 +213,7 @@ def makeIFTWithFormatID(formatId, testName):
     nft = NFTFile(testName)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
+    nft.setIFTTableData(bytes(raw))
     nft.writeTestIFTFile()
 
 testType = "client"

@@ -54,7 +54,7 @@ def makeSubsettedFont(sourceFontPath,mode):
     fileNameWithoutExt, ext = os.path.splitext(fileName)
     # Configure input and output file paths
     subsetFont = os.path.join(subsetFontPath, f"{fileNameWithoutExt}-subset{ext}")
-    finalFontPath = os.path.join(subsetFontPath, f"{fileNameWithoutExt}-{mode}.ttf")
+    finalFontPath = os.path.join(subsetFontPath, f"{fileNameWithoutExt}-{mode}{ext}")
 
 
     font = TTFont(sourceFontPath)

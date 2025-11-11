@@ -199,6 +199,8 @@ class NFTFile:
         self.tbl = self.font["IFT "]
         self.raw = bytearray(self.tbl.data)
         return self.raw
+    def setIFTTableData(self, data):
+        self.raw = bytearray(data)
     def writeTestIFTFile(self):
         if self.tbl and self.raw:
             self.tbl.data = bytes(self.raw)
@@ -260,7 +262,8 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
             # set end to invalid value
             invalidEndFixed = int(-1 * (1 << 16))  # negative 16.16 fixed
             entriesData[endOffset:endOffset+4] = struct.pack(">i", invalidEndFixed)
-
+    iftData = bytearray(iftData[:entriesOffset]) + entriesData
+    nft.setIFTTableData(bytes(iftData)) 
     # Write back
     nft.writeTestIFTFile()
 

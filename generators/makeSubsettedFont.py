@@ -47,11 +47,13 @@ mode = sys.argv[1]
 # Step 1: Create subset font containing only required glyphs
 # Only keep glyphs needed for test words "PASS" and "FAIL"
 glyphs_to_keep = ["A", "F", "I", "L", "P", "S"]
-subset_font_path = os.path.join(subsetFontPath, "Roboto-subset.ttf")
 
 def makeSubsettedFont(sourceFontPath,mode):
     print(f"Generating subsetted font {sourceFontPath} in '{mode}' mode...")
+    fileName = os.path.basename(sourceFontPath)
+    fileNameWithoutExt, ext = os.path.splitext(fileName)
     # Configure input and output file paths
+    subset_font_path = os.path.join(subsetFontPath, fileNameWithoutExt + "-subset"+ext)
     final_font_path = os.path.join(subsetFontPath, f"Roboto{mode.capitalize()}.ttf")
 
 

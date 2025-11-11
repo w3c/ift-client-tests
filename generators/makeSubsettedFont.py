@@ -29,7 +29,7 @@ test results visually in IFT client tests.
 
 import os
 import sys
-from testCaseGeneratorLib.paths import subsetFontPath, TTFSourcePath
+from testCaseGeneratorLib.paths import subsetFontPath, TTFSourcePath, CFFSourcePath
 from fontTools.ttLib import TTFont, newTable
 from fontTools.subset import Subsetter, Options
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -132,3 +132,4 @@ def makeSubsettedFont(sourceFontPath,mode):
         print(f"Warning: Could not remove {subsetFont}: {e}")
 
 makeSubsettedFont(TTFSourcePath,mode)
+makeSubsettedFont(CFFSourcePath,mode)

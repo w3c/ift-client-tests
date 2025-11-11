@@ -29,6 +29,7 @@ resourcesDirectory = os.path.join(mainDirectory, "generators", "resources")
 IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "myfont.ift.woff2")
 # directory for source font file
 TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","glyf.ttf") 
+CFFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","cff.otf") 
 # directory for subsetted font files
 subsetFontPath = os.path.join(mainDirectory,"generators","subsettedFonts") 
 # fallback font path

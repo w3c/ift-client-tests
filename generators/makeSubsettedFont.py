@@ -53,8 +53,8 @@ def makeSubsettedFont(sourceFontPath,mode):
     fileName = os.path.basename(sourceFontPath)
     fileNameWithoutExt, ext = os.path.splitext(fileName)
     # Configure input and output file paths
-    subset_font_path = os.path.join(subsetFontPath, fileNameWithoutExt + "-subset"+ext)
-    final_font_path = os.path.join(subsetFontPath, f"Roboto{mode.capitalize()}.ttf")
+    subsetFont = os.path.join(subsetFontPath, fileNameWithoutExt + "-subset"+ext)
+    finalFontPath = os.path.join(subsetFontPath, f"Roboto{mode.capitalize()}.ttf")
 
 
     font = TTFont(sourceFontPath)
@@ -71,12 +71,11 @@ def makeSubsettedFont(sourceFontPath,mode):
     subsetter = Subsetter(options=options)
     subsetter.populate(glyphs=glyphs_to_keep + [".notdef", "space"])
     subsetter.subset(font)
-    font.save(subset_font_path)
+    font.save(subsetFont)
 
     # Step 2: Add ligature substitution rules to the subset font
     # Reload the font to work with the subset version
-    font = TTFont(subset_font_path)
-
+    font = TTFont(subsetFont)
     # Update font family name to reflect its test purpose
     new_name = f"RobotoFallback{mode.capitalize()}"
 
@@ -122,14 +121,14 @@ def makeSubsettedFont(sourceFontPath,mode):
     addOpenTypeFeaturesFromString(font, fea_code)
 
     # Step 3: Save the final processed font
-    font.save(final_font_path)
-    print(f"Font saved to {final_font_path}")
+    font.save(finalFontPath)
+    print(f"Font saved to {finalFontPath}")
 
     # Clean up: Remove the temporary subset font file
     try:
-        os.remove(subset_font_path)
-        print(f"Removed intermediate file: {subset_font_path}")
+        os.remove(subsetFont)
+        print(f"Removed intermediate file: {subsetFont}")
     except Exception as e:
-        print(f"Warning: Could not remove {subset_font_path}: {e}")
+        print(f"Warning: Could not remove {subsetFont}: {e}")
 
 makeSubsettedFont(TTFSourcePath,mode)

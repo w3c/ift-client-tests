@@ -47,7 +47,7 @@ ift-client-tests$ cd generators
 ift-client-tests/generators$ python makeSubsettedFont.py fallback
 ```
 
-(this will generate a font file that substitutes the letter `P` with the glyph sequence `FAIL` and the letter `F` with the glyph sequence `PASS`)
+(this will generate font files that substitute the letter `P` with the glyph sequence `FAIL` and the letter `F` with the glyph sequence `PASS`)
 
 Create the source font for the IFT:
 
@@ -57,7 +57,7 @@ ift-client-tests$ cd generators
 ift-client-tests/generators$ python makeSubsettedFont.py ift
 ```
 
-(this will generate a font file that substitutes the letter `P` with the glyph sequence `PASS` and the letter `F` with the glyph sequence `FAIL`)
+(this will generate font files that substitute the letter `P` with the glyph sequence `PASS` and the letter `F` with the glyph sequence `FAIL`)
 
 To encode the subsetted IFT from the IFT source font:
 

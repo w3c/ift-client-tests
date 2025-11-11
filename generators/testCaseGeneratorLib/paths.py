@@ -32,7 +32,7 @@ TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","glyf.ttf"
 # directory for subsetted font files
 subsetFontPath = os.path.join(mainDirectory,"generators","subsettedFonts") 
 # fallback font path
-fallbackFontPath = os.path.join(subsetFontPath, "Robotofallback.ttf")
+fallbackFontPath = os.path.join(subsetFontPath, "glyf-fallback.ttf")
 # directories for test output
 fontsDirectory = os.path.join(mainDirectory, "client","fonts")
 # directory for subset fonts

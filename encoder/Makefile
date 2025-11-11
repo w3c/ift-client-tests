@@ -4,31 +4,53 @@ BAZEL_OPTS = -c opt --copt=-DABSL_MIN_LOG_LEVEL=absl::LogSeverity::kInfo
 
 all: fonts
 
-fonts: glyf-ift
+fonts: glyf-ift 
 
 always:
 
-
-glyf-ift: build/Roboto-Preprocessed.ttf config/roboto_segmentation_plan.txtpb
+# TODO: add subdirectory to IFT directory for each type of font and update "fonts:" to include CFF
+glyf-ift: build/glyf-Preprocessed.ttf config/segmentation_plan.txtpb
 	bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
-		--input_font=$(CURDIR)/build/Roboto-Preprocessed.ttf \
-		--plan=$(CURDIR)/config/roboto_segmentation_plan.txtpb \
+		--input_font=$(CURDIR)/build/glyf-Preprocessed.ttf \
+		--plan=$(CURDIR)/config/segmentation_plan.txtpb \
 		--output_path=$(CURDIR)/../generators/resources/IFT \
 		--output_font="glyf.ift.woff2"
 
-build/Roboto-Preprocessed.ttf: ../generators/subsettedFonts/glyf-ift.ttf
+build/glyf-Preprocessed.ttf: ../generators/subsettedFonts/glyf-ift.ttf
 	bazel run $(BAZEL_OPTS) @harfbuzz//:hb-subset -- $(CURDIR)/../generators/subsettedFonts/glyf-ift.ttf \
 		--keep-everything \
 		--no-hinting \
-		-o $(CURDIR)/build/Roboto-Preprocessed.ttf
+		-o $(CURDIR)/build/glyf-Preprocessed.ttf
 
-config/roboto_segmentation_plan.txtpb: build/Roboto-Preprocessed.ttf config/roboto_segmentation_config.txtpb
+config/segmentation_plan.txtpb: build/glyf-Preprocessed.ttf config/segmentation_config.txtpb
 	bazel run $(BAZEL_OPTS) @ift_encoder//util:closure_glyph_keyed_segmenter_util -- \
-	      --input_font=$(CURDIR)/build/Roboto-Preprocessed.ttf \
-	      --config=$(CURDIR)/config/roboto_segmentation_config.txtpb \
+	      --input_font=$(CURDIR)/build/glyf-Preprocessed.ttf \
+	      --config=$(CURDIR)/config/segmentation_config.txtpb \
 	      --nooutput_segmentation_analysis \
 	      --include_initial_codepoints_in_config \
-	      --output_segmentation_plan > $(CURDIR)/config/roboto_segmentation_plan.txtpb
+	      --output_segmentation_plan > $(CURDIR)/config/segmentation_plan.txtpb
+
+# cff
+cff-ift: build/cff-Preprocessed.ttf config/segmentation_plan.txtpb
+	bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/cff-Preprocessed.ttf \
+		--plan=$(CURDIR)/config/segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/../generators/resources/IFT \
+		--output_font="cff.ift.woff2"
+
+build/cff-Preprocessed.ttf: ../generators/subsettedFonts/cff-ift.otf
+	bazel run $(BAZEL_OPTS) @harfbuzz//:hb-subset -- $(CURDIR)/../generators/subsettedFonts/cff-ift.otf \
+		--keep-everything \
+		--no-hinting \
+		-o $(CURDIR)/build/cff-Preprocessed.ttf
+
+config/segmentation_plan.txtpb: build/cff-Preprocessed.ttf config/segmentation_config.txtpb
+	bazel run $(BAZEL_OPTS) @ift_encoder//util:closure_glyph_keyed_segmenter_util -- \
+	      --input_font=$(CURDIR)/build/cff-Preprocessed.ttf \
+	      --config=$(CURDIR)/config/segmentation_config.txtpb \
+	      --nooutput_segmentation_analysis \
+	      --include_initial_codepoints_in_config \
+	      --output_segmentation_plan > $(CURDIR)/config/segmentation_plan.txtpb
 
 clean: 
 	rm -f build/*

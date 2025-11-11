@@ -4,13 +4,12 @@ BAZEL_OPTS = -c opt --copt=-DABSL_MIN_LOG_LEVEL=absl::LogSeverity::kInfo
 
 all: fonts
 
-fonts: fonts/roboto/Roboto-IFT.woff2 
+fonts: glyf-ift
 
 always:
 
 
-fonts/roboto/Roboto-IFT.woff2: build/Roboto-Preprocessed.ttf config/roboto_segmentation_plan.txtpb
-	mkdir -p fonts/roboto
+glyf-ift: build/Roboto-Preprocessed.ttf config/roboto_segmentation_plan.txtpb
 	bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
 		--input_font=$(CURDIR)/build/Roboto-Preprocessed.ttf \
 		--plan=$(CURDIR)/config/roboto_segmentation_plan.txtpb \
@@ -33,5 +32,4 @@ config/roboto_segmentation_plan.txtpb: build/Roboto-Preprocessed.ttf config/robo
 
 clean: 
 	rm -f build/*
-	rm -rf fonts/*
 	rm -rf ../generators/resources/IFT/*

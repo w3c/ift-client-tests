@@ -15,7 +15,7 @@ fonts/roboto/Roboto-IFT.woff2: build/Roboto-Preprocessed.ttf config/roboto_segme
 		--input_font=$(CURDIR)/build/Roboto-Preprocessed.ttf \
 		--plan=$(CURDIR)/config/roboto_segmentation_plan.txtpb \
 		--output_path=$(CURDIR)/../generators/resources/IFT \
-		--output_font="myfont.ift.woff2"
+		--output_font="glyf.ift.woff2"
 
 build/Roboto-Preprocessed.ttf: ../generators/subsettedFonts/glyf-ift.ttf
 	bazel run $(BAZEL_OPTS) @harfbuzz//:hb-subset -- $(CURDIR)/../generators/subsettedFonts/glyf-ift.ttf \

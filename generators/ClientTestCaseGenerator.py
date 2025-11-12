@@ -26,7 +26,7 @@ import struct
 import zipfile
 from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, IFTSourcePath, fallbackFontPath
+                          clientTestResourcesDirectory, fallbackFontPath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 
 # IFT Table Header Offsets 

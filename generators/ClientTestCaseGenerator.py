@@ -288,21 +288,6 @@ def removeIFTTable(fontFormat, testName):
     nft.removeIFTTable()
     nft.writeTestIFTFile()
 
-testTag = "conform-require-ift-table"
-identifierString= "%s-%s" % (testType, testTag)
-fontFormats = ["GLYF","CFF"]
-writeTest(
-    identifier=identifierString,
-    title="IFT table missing",
-    description="All incremental fonts must contain the 'IFT ' table.",
-    shouldShowIFT=False,
-    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink= "#%s" % identifierString,
-    fontFormats=fontFormats,
-    func=removeIFTTable,
-    funcArgs=(identifierString,)
-)
-
 testTag = "conform-design-space-segment-end-invalid-value"
 identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF","CFF"]
@@ -315,6 +300,21 @@ writeTest(
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithInvalidDesignSpaceSegmentEndValue,
+    funcArgs=(identifierString,)
+)
+
+testTag = "conform-require-ift-table"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="IFT table missing",
+    description="All incremental fonts must contain the 'IFT ' table.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=removeIFTTable,
     funcArgs=(identifierString,)
 )
 

@@ -175,7 +175,8 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
             title=title,
             description=description,
             shouldShowIFT=shouldShowIFT,
-            specLink=specLink
+            specLink=specLink,
+            fontFormats=fontFormats,
         )
     )
 
@@ -212,7 +213,9 @@ class NFTFile:
     def writeTestIFTFile(self):
         if self.tbl and self.raw:
             self.tbl.data = bytes(self.raw)
-        outPath = os.path.join(self.testDirectory, IFT_FONT_FILENAME)
+        outPath = os.path.join(self.testDirectory,self.format,  IFT_FONT_FILENAME)
+        if not os.path.exists(os.path.join(self.testDirectory,self.format)):
+            os.makedirs(os.path.join(self.testDirectory,self.format))
         self.font.save(outPath)
     
 

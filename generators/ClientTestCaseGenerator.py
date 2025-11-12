@@ -195,10 +195,13 @@ class NFTFile:
     def copyIFTSourceFiles(self):
         # Copy _gk and _tk files from resources/IFT/ to testDirectory
         sourceDir = os.path.join(resourcesDirectory, "IFT",self.format)
+        destDir = os.path.join(self.testDirectory,self.format)
+        if not os.path.exists(destDir):
+            os.makedirs(destDir)
         for pattern in ("*_gk", "*_tk"):
             for filePath in glob.glob(os.path.join(sourceDir, pattern)):
-                shutil.copy(filePath, self.testDirectory)
-                print(f"Copied {filePath} to {self.testDirectory}")
+                shutil.copy(filePath, destDir)
+                print(f"Copied {filePath} to {destDir}")
     def getIFTTableData(self):
         if "IFT " not in self.font:
             raise ValueError("IFT table not found in font.")

@@ -180,6 +180,7 @@ class NFTFile:
         self.testName = testName 
         self.testDirectory = os.path.join(clientTestDirectory, testName)
         self.sourceFontPath = sourceFontPath
+        self.font = TTFont(self.sourceFontPath)
         self.createTestDirectory()
         self.copyIFTSourceFiles()
     def createTestDirectory(self):
@@ -193,7 +194,6 @@ class NFTFile:
                 shutil.copy(filePath, self.testDirectory)
                 print(f"Copied {filePath} to {self.testDirectory}")
     def getIFTTableData(self):
-        self.font = TTFont(self.sourceFontPath)
         if "IFT " not in self.font:
             raise ValueError("IFT table not found in font.")
         # Unknown/custom tables are stored as raw bytes on .data
@@ -212,8 +212,8 @@ class NFTFile:
     
 
 # start of tests
-def makeIFTWithFormatID(formatId, testName,iftFile):
-    nft = NFTFile(testName,iftFile)
+def makeIFTWithFormatID(formatId, testName):
+    nft = NFTFile(testName,IFTSourcePath)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
     nft.setIFTTableData(bytes(raw))
@@ -230,12 +230,12 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
-    func=lambda: makeIFTWithFormatID(3, identifierString, IFTSourcePath) 
+    func=lambda: makeIFTWithFormatID(3, identifierString) 
 )
 
-def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName,iftFile): 
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = NFTFile(testName,iftFile)
+    nft = NFTFile(testName,IFTSourcePath)
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -280,11 +280,11 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
-    func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString, IFTSourcePath) 
+    func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString) 
 )
 
-def removeIFTTable(testName, iftFile):
-    nft = NFTFile(testName, iftFile)
+def removeIFTTable(testName ):
+    nft = NFTFile(testName, IFTSourcePath)
     raw = nft.getIFTTableData()
     nft.removeIFTTable()
     nft.writeTestIFTFile()
@@ -298,7 +298,7 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
-    func=lambda: removeIFTTable(identifierString, IFTSourcePath) 
+    func=lambda: removeIFTTable(identifierString) 
 )
 
 # ------------------

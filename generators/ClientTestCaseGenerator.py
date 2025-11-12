@@ -124,7 +124,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldShowIFT=False):
+def writeTest(identifier, title, description, func, fontFormats, specLink=None, credits=[], shouldShowIFT=False):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -224,6 +224,7 @@ testType = "client"
 
 testTag = "conform-format2-valid-format-number"
 identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF"]
 writeTest(
     identifier=identifierString,
     title="Format 2 with invalid format number",
@@ -231,6 +232,7 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
     func=lambda: makeIFTWithFormatID(3, identifierString) 
 )
 
@@ -274,6 +276,7 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
 
 testTag = "conform-design-space-segment-end-invalid-value"
 identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF"]
 writeTest(
     identifier=identifierString,
     title="Format 2 with invalid design space segment end value",
@@ -281,6 +284,7 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
     func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString) 
 )
 
@@ -292,6 +296,7 @@ def removeIFTTable(testName ):
 
 testTag = "conform-require-ift-table"
 identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF"]
 writeTest(
     identifier=identifierString,
     title="IFT table missing",
@@ -299,6 +304,7 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
     func=lambda: removeIFTTable(identifierString) 
 )
 

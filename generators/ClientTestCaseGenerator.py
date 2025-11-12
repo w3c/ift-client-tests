@@ -211,8 +211,8 @@ class NFTFile:
         return self.raw
     def setIFTTableData(self, data):
         self.raw = bytearray(data)
-    def removeIFTTable(self):
-        del self.font["IFT "]
+    def removeTable(self,tableTag):
+        del self.font[tableTag]
     def writeTestIFTFile(self):
         if self.tbl and self.raw:
             self.tbl.data = bytes(self.raw)
@@ -285,12 +285,6 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName):
     # Write back
     nft.writeTestIFTFile()
 
-def removeIFTTable(fontFormat, testName):
-    nft = NFTFile(testName, fontFormat)
-    raw = nft.getIFTTableData()
-    nft.removeIFTTable()
-    nft.writeTestIFTFile()
-
 testTag = "conform-design-space-segment-end-invalid-value"
 identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF","CFF"]
@@ -306,6 +300,12 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def removeTable(fontFormat, testName, tableTag):
+    nft = NFTFile(testName, fontFormat)
+    raw = nft.getIFTTableData()
+    nft.removeTable("IFT ")
+    nft.writeTestIFTFile()
+
 testTag = "conform-require-ift-table"
 identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF","CFF"]
@@ -317,8 +317,8 @@ writeTest(
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
-    func=removeIFTTable,
-    funcArgs=(identifierString,)
+    func=removeTable,
+    funcArgs=(identifierString,"IFT ",)
 )
 
 

@@ -26,7 +26,7 @@ mainDirectory = dirname(mainDirectory, 2)
 # directory for test case resources,
 resourcesDirectory = os.path.join(mainDirectory, "generators", "resources")
 # paths to specific resources
-IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "glyf.ift.woff2")
+IFTSourcePath = os.path.join(resourcesDirectory, "IFT", "GLYF", "font.ift.woff2")
 # directory for source font file
 TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","glyf.ttf") 
 CFFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","cff.otf") 

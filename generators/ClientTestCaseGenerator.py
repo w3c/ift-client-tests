@@ -124,7 +124,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, func, fontFormats, specLink=None, credits=[], shouldShowIFT=False):
+def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -153,7 +153,10 @@ def writeTest(identifier, title, description, func, fontFormats, specLink=None, 
 
     """
     print("Compiling %s..." % identifier)
-    func()
+    if funcArgs is not None:
+        func(*funcArgs)
+    else:
+        func()
     assert identifier not in registeredIdentifiers, "Duplicate identifier! %s" % identifier
     assert title not in registeredTitles, "Duplicate title! %s" % title
     assert description not in registeredDescriptions, "Duplicate description! %s" % description
@@ -233,7 +236,8 @@ writeTest(
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
-    func=lambda: makeIFTWithFormatID(3, identifierString) 
+    func=makeIFTWithFormatID,
+    funcArgs=(3, identifierString) 
 )
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
@@ -285,7 +289,8 @@ writeTest(
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
-    func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString) 
+    func=makeIFTWithInvalidDesignSpaceSegmentEndValue,
+    funcArgs=(identifierString,)
 )
 
 def removeIFTTable(testName ):
@@ -305,7 +310,8 @@ writeTest(
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
-    func=lambda: removeIFTTable(identifierString) 
+    func=removeIFTTable,
+    funcArgs=(identifierString,)
 )
 
 # ------------------

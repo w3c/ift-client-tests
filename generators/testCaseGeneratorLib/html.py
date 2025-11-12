@@ -155,7 +155,7 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
             render_text = "Should Render IFT" if shouldShowIFT != "F" else "Should Not Render IFT"
             for fontFormat in fontFormats:
                 format_identifier = "%s-%s" % (fontFormat, identifier)
-                string = "%s: <span id=\"%s\" data-format=\"%s\" class=\"result\">%s</span>" % (render_text, format_identifier,fontFormat,shouldShowIFT)
+                string = "%s: <span id=\"%s\" data-format=\"%s\" class=\"result\">%s</span> (%s)" % (render_text, format_identifier,fontFormat,shouldShowIFT,fontFormat)
                 html_string.append("\t\t\t\t\t<p>%s</p>" % string)
             # documentation
             if specLink is not None:

@@ -153,10 +153,11 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
 
     """
     print("Compiling %s..." % identifier)
-    if funcArgs is not None:
-        func(*funcArgs)
-    else:
-        func()
+    for fontFormat in fontFormats:
+        if funcArgs is not None:
+            func(fontFormat, *funcArgs)
+        else:
+            func(fontFormat)
     assert identifier not in registeredIdentifiers, "Duplicate identifier! %s" % identifier
     assert title not in registeredTitles, "Duplicate title! %s" % title
     assert description not in registeredDescriptions, "Duplicate description! %s" % description
@@ -216,8 +217,8 @@ class NFTFile:
     
 
 # start of tests
-def makeIFTWithFormatID(formatId, testName):
-    nft = NFTFile(testName,"GLYF")
+def makeIFTWithFormatID(fontFormat, formatId, testName):
+    nft = NFTFile(testName,fontFormat)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
     nft.setIFTTableData(bytes(raw))
@@ -240,9 +241,9 @@ writeTest(
     funcArgs=(3, identifierString) 
 )
 
-def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = NFTFile(testName,"GLYF")
+    nft = NFTFile(testName,fontFormat)
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -293,8 +294,8 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
-def removeIFTTable(testName ):
-    nft = NFTFile(testName, "GLYF")
+def removeIFTTable(fontFormat, testName):
+    nft = NFTFile(testName, fontFormat)
     raw = nft.getIFTTableData()
     nft.removeIFTTable()
     nft.writeTestIFTFile()

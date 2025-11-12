@@ -5,4 +5,4 @@ MODULE.bazel.lock
 build/
 bazel-*
 fonts/
-config/roboto_segmentation_plan.txtpb
+config/segmentation_plan.txtpb

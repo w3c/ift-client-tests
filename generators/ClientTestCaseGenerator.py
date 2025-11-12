@@ -176,10 +176,11 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
     )
 
 class NFTFile:
-    def __init__(self, testName,sourceFontPath):
+    def __init__(self, testName,format):
         self.testName = testName 
+        self.format = format
         self.testDirectory = os.path.join(clientTestDirectory, testName)
-        self.sourceFontPath = sourceFontPath
+        self.sourceFontPath = os.path.join(resourcesDirectory, "IFT", format, "font.ift.woff2")
         self.font = TTFont(self.sourceFontPath)
         self.createTestDirectory()
         self.copyIFTSourceFiles()
@@ -188,7 +189,7 @@ class NFTFile:
             os.makedirs(self.testDirectory)
     def copyIFTSourceFiles(self):
         # Copy _gk and _tk files from resources/IFT/ to testDirectory
-        sourceDir = os.path.join(resourcesDirectory, "IFT")
+        sourceDir = os.path.join(resourcesDirectory, "IFT",self.format)
         for pattern in ("*_gk", "*_tk"):
             for filePath in glob.glob(os.path.join(sourceDir, pattern)):
                 shutil.copy(filePath, self.testDirectory)
@@ -213,7 +214,7 @@ class NFTFile:
 
 # start of tests
 def makeIFTWithFormatID(formatId, testName):
-    nft = NFTFile(testName,IFTSourcePath)
+    nft = NFTFile(testName,"GLYF")
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
     nft.setIFTTableData(bytes(raw))
@@ -235,7 +236,7 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = NFTFile(testName,IFTSourcePath)
+    nft = NFTFile(testName,"GLYF")
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -284,7 +285,7 @@ writeTest(
 )
 
 def removeIFTTable(testName ):
-    nft = NFTFile(testName, IFTSourcePath)
+    nft = NFTFile(testName, "GLYF")
     raw = nft.getIFTTableData()
     nft.removeIFTTable()
     nft.writeTestIFTFile()

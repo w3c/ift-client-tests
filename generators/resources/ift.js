@@ -24,7 +24,7 @@ async function update_all_fonts() {
       let f1 = await p1;
       document.fonts.add(f1);
     } catch (e) {
-      console.error(`Error updating font for ${test_name}:`, e);
+      console.error(`Error updating font for ${test_name} (${font_format}):`, e);
       continue; // Skip to the next element
     }
   }

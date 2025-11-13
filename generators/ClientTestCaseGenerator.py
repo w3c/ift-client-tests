@@ -303,7 +303,7 @@ writeTest(
 def removeTable(fontFormat, testName, tableTag):
     nft = NFTFile(testName, fontFormat)
     raw = nft.getIFTTableData()
-    nft.removeTable("IFT ")
+    nft.removeTable(tableTag)
     nft.writeTestIFTFile()
 
 testTag = "conform-require-ift-table"

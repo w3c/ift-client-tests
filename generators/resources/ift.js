@@ -5,11 +5,13 @@ async function update_all_fonts() {
   // Get all elements with class 'result'
   const resultElements = document.getElementsByClassName('result');
   for (let el of resultElements) {
-    let test_name = el.id;
+    let test_name = el.id.replace(/^[^-]+-/, ''); // remove format prefix
+    console.log("Processing test:", test_name);
+    let font_format = el.getAttribute('data-format');
     let rndNum = Math.floor(Math.random() * 100000); // to break caching
-    let title_font = `${test_name}/myfont-mod.ift.otf?v=${rndNum}`;
+    let title_font = `${test_name}/${font_format}/myfont-mod.ift.woff2?v=${rndNum}`;
     let title_text = document.getElementById(test_name).innerText;
-    let font_name = test_name + " IFT Font";
+    let font_name = font_format + "-" + test_name + "-IFT-Font";
     // check to see if element contains pass or fail class
     let fallback_font_name = "RobotoFallback";
     el.style.fontFamily = `${font_name}, ${fallback_font_name}`;
@@ -22,7 +24,7 @@ async function update_all_fonts() {
       let f1 = await p1;
       document.fonts.add(f1);
     } catch (e) {
-      console.error(`Error updating font for ${test_name}:`, e);
+      console.error(`Error updating font for ${test_name} (${font_format}):`, e);
       continue; // Skip to the next element
     }
   }

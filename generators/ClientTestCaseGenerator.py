@@ -26,7 +26,7 @@ import struct
 import zipfile
 from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, IFTSourcePath
+                          clientTestResourcesDirectory, fallbackFontPath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 
 # IFT Table Header Offsets 
@@ -34,7 +34,7 @@ IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29
 IFT_FORMAT_OFFSET = 0
 # Other constants
-IFT_FONT_FILENAME = "myfont-mod.ift.otf"
+IFT_FONT_FILENAME = "myfont-mod.ift.woff2"
 
 # ------------------
 # Directory Creation
@@ -86,7 +86,9 @@ shutil.copytree(os.path.join(resourcesDirectory, "rust-client"), destPath)
 destPath = os.path.join(clientTestResourcesDirectory,"fallback")
 if os.path.exists(destPath):
     shutil.rmtree(destPath)
-shutil.copytree(os.path.join(resourcesDirectory, "fallback"), destPath)
+os.makedirs(destPath)
+shutil.copy(fallbackFontPath, os.path.join(destPath, "Roboto.ttf"))
+
 # ---------------
 # Test Case Index
 # ---------------
@@ -122,7 +124,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, func, specLink=None, credits=[], shouldShowIFT=False):
+def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -151,7 +153,11 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
 
     """
     print("Compiling %s..." % identifier)
-    func()
+    for fontFormat in fontFormats:
+        if funcArgs is not None:
+            func(fontFormat, *funcArgs)
+        else:
+            func(fontFormat)
     assert identifier not in registeredIdentifiers, "Duplicate identifier! %s" % identifier
     assert title not in registeredTitles, "Duplicate title! %s" % title
     assert description not in registeredDescriptions, "Duplicate description! %s" % description
@@ -169,14 +175,18 @@ def writeTest(identifier, title, description, func, specLink=None, credits=[], s
             title=title,
             description=description,
             shouldShowIFT=shouldShowIFT,
-            specLink=specLink
+            specLink=specLink,
+            fontFormats=fontFormats,
         )
     )
 
 class NFTFile:
-    def __init__(self, testName):
+    def __init__(self, testName,format):
         self.testName = testName 
+        self.format = format
         self.testDirectory = os.path.join(clientTestDirectory, testName)
+        self.sourceFontPath = os.path.join(resourcesDirectory, "IFT", format, "font.ift.woff2")
+        self.font = TTFont(self.sourceFontPath)
         self.createTestDirectory()
         self.copyIFTSourceFiles()
     def createTestDirectory(self):
@@ -184,37 +194,47 @@ class NFTFile:
             os.makedirs(self.testDirectory)
     def copyIFTSourceFiles(self):
         # Copy _gk and _tk files from resources/IFT/ to testDirectory
-        sourceDir = os.path.join(resourcesDirectory, "IFT")
+        sourceDir = os.path.join(resourcesDirectory, "IFT",self.format)
+        destDir = os.path.join(self.testDirectory,self.format)
+        if not os.path.exists(destDir):
+            os.makedirs(destDir)
         for pattern in ("*_gk", "*_tk"):
             for filePath in glob.glob(os.path.join(sourceDir, pattern)):
-                shutil.copy(filePath, self.testDirectory)
-                print(f"Copied {filePath} to {self.testDirectory}")
+                shutil.copy(filePath, destDir)
+                print(f"Copied {filePath} to {destDir}")
     def getIFTTableData(self):
-        self.font = TTFont(IFTSourcePath)
         if "IFT " not in self.font:
             raise ValueError("IFT table not found in font.")
         # Unknown/custom tables are stored as raw bytes on .data
         self.tbl = self.font["IFT "]
         self.raw = bytearray(self.tbl.data)
         return self.raw
+    def setIFTTableData(self, data):
+        self.raw = bytearray(data)
+    def removeTable(self,tableTag):
+        del self.font[tableTag]
     def writeTestIFTFile(self):
         if self.tbl and self.raw:
             self.tbl.data = bytes(self.raw)
-        outPath = os.path.join(self.testDirectory, IFT_FONT_FILENAME)
+        outPath = os.path.join(self.testDirectory,self.format,  IFT_FONT_FILENAME)
+        if not os.path.exists(os.path.join(self.testDirectory,self.format)):
+            os.makedirs(os.path.join(self.testDirectory,self.format))
         self.font.save(outPath)
     
 
 # start of tests
-def makeIFTWithFormatID(formatId, testName):
-    nft = NFTFile(testName)
+def makeIFTWithFormatID(fontFormat, formatId, testName):
+    nft = NFTFile(testName,fontFormat)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
+    nft.setIFTTableData(bytes(raw))
     nft.writeTestIFTFile()
 
 testType = "client"
 
 testTag = "conform-format2-valid-format-number"
 identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
 writeTest(
     identifier=identifierString,
     title="Format 2 with invalid format number",
@@ -222,12 +242,14 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
-    func=lambda: makeIFTWithFormatID(3, identifierString) 
+    fontFormats=fontFormats,
+    func=makeIFTWithFormatID,
+    funcArgs=(3, identifierString) 
 )
 
-def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName): 
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = NFTFile(testName)
+    nft = NFTFile(testName,fontFormat)
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -239,7 +261,6 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
     offset += 1
 
     hasFeature = formatFlags & 0b00000001
-    print("hasFeature", hasFeature)
     if hasFeature:
         # featureCount + featureTags
         featureCount = entriesData[offset]
@@ -259,12 +280,14 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(testName):
             # set end to invalid value
             invalidEndFixed = int(-1 * (1 << 16))  # negative 16.16 fixed
             entriesData[endOffset:endOffset+4] = struct.pack(">i", invalidEndFixed)
-
+    iftData = bytearray(iftData[:entriesOffset]) + entriesData
+    nft.setIFTTableData(bytes(iftData)) 
     # Write back
     nft.writeTestIFTFile()
 
 testTag = "conform-design-space-segment-end-invalid-value"
 identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
 writeTest(
     identifier=identifierString,
     title="Format 2 with invalid design space segment end value",
@@ -272,8 +295,33 @@ writeTest(
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink= "#%s" % identifierString,
-    func=lambda: makeIFTWithInvalidDesignSpaceSegmentEndValue(identifierString) 
+    fontFormats=fontFormats,
+    func=makeIFTWithInvalidDesignSpaceSegmentEndValue,
+    funcArgs=(identifierString,)
 )
+
+def removeTable(fontFormat, testName, tableTag):
+    nft = NFTFile(testName, fontFormat)
+    nft.getIFTTableData()
+    nft.removeTable(tableTag)
+    nft.writeTestIFTFile()
+
+testTag = "conform-require-ift-table"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="IFT table missing",
+    description="All incremental fonts must contain the 'IFT ' table.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=removeTable,
+    funcArgs=(identifierString,"IFT ",)
+)
+
+
 # ------------------
 # Generate the Index
 # ------------------

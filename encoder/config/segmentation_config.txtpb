@@ -1,0 +1,91 @@
+generate_table_keyed_segments: true
+brotli_quality: 11
+
+feature_segments {
+  key: 1
+  value: {
+    values: "c2sc"
+    values: "smcp"
+  }
+}
+
+base_segmentation_plan {
+  initial_design_space {
+    ranges {
+      key: "wdth"
+      value: {
+        start: 100.0
+        end: 100.0
+      }
+    }
+    ranges {
+      key: "wght"
+      value: {
+        start: 100.0
+        end: 400.0
+      }
+    }
+  }
+  non_glyph_design_space_segmentation {
+    ranges {
+      key: "wdth"
+      value: {
+        start: 75.0
+        end: 100.0
+      }
+    }
+    ranges {
+      key: "wght"
+      value: {
+        start: 100.0
+        end: 900.0
+      }
+    }
+  }
+  jump_ahead: 2
+  use_prefetch_lists: true
+}
+
+# These were copied from a previous run where initial font merging
+# was enabled using brotli 11. With brotli 11 the init font merge
+# processing is quite slow so recording the previously found set
+# here saves a lot of processing time.
+initial_segment {
+  codepoints {
+  values: 32
+  values: 33
+  values: 34
+  values: 44
+  }
+}
+
+ungrouped_config {
+  min_patch_size: 5000
+}
+
+base_cost_config {
+  use_bigrams: true
+  optimization_cutoff_fraction: 0.0025
+  min_group_size: 4
+}
+
+# Latin
+merge_groups {
+  name: "Latin"
+  cost_config {
+    built_in_freq_data_name: "Script_latin.riegeli"
+  }
+}
+
+# Group for optional features
+merge_groups {
+  name: "Optional Features"
+  segment_ids {
+    # disable automatic assignment.
+  }
+  feature_segment_ids {
+    values: 1
+  }
+  heuristic_config {
+  }
+}

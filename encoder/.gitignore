@@ -5,4 +5,5 @@ MODULE.bazel.lock
 build/
 bazel-*
 fonts/
-config/segmentation_plan.txtpb
+config/glyf_segmentation_plan.txtpb
+config/cff_segmentation_plan.txtpb  

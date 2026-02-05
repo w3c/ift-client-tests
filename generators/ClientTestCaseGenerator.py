@@ -28,6 +28,7 @@ from fontTools.ttLib import TTFont
 from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
                           clientTestResourcesDirectory, fallbackFontPath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
+from testCaseGeneratorLib.iftFile import IFTFile
 
 # IFT Table Header Offsets 
 IFT_ENTRIES_OFFSET_START = 25
@@ -180,51 +181,10 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
         )
     )
 
-class IFTFile:
-    def __init__(self, testName,format):
-        self.testName = testName 
-        self.format = format
-        self.testDirectory = os.path.join(clientTestDirectory, testName)
-        self.sourceFontPath = os.path.join(resourcesDirectory, "IFT", format, "font.ift.woff2")
-        self.font = TTFont(self.sourceFontPath)
-        self.createTestDirectory()
-        self.copyIFTSourceFiles()
-    def createTestDirectory(self):
-        if not os.path.exists(self.testDirectory):
-            os.makedirs(self.testDirectory)
-    def copyIFTSourceFiles(self):
-        # Copy _gk and _tk files from resources/IFT/ to testDirectory
-        sourceDir = os.path.join(resourcesDirectory, "IFT",self.format)
-        destDir = os.path.join(self.testDirectory,self.format)
-        if not os.path.exists(destDir):
-            os.makedirs(destDir)
-        for pattern in ("*_gk", "*_tk"):
-            for filePath in glob.glob(os.path.join(sourceDir, pattern)):
-                shutil.copy(filePath, destDir)
-                print(f"Copied {filePath} to {destDir}")
-    def getIFTTableData(self):
-        if "IFT " not in self.font:
-            raise ValueError("IFT table not found in font.")
-        # Unknown/custom tables are stored as raw bytes on .data
-        self.tbl = self.font["IFT "]
-        self.raw = bytearray(self.tbl.data)
-        return self.raw
-    def setIFTTableData(self, data):
-        self.raw = bytearray(data)
-    def removeTable(self,tableTag):
-        del self.font[tableTag]
-    def writeTestIFTFile(self):
-        if self.tbl and self.raw:
-            self.tbl.data = bytes(self.raw)
-        outPath = os.path.join(self.testDirectory,self.format,  IFT_FONT_FILENAME)
-        if not os.path.exists(os.path.join(self.testDirectory,self.format)):
-            os.makedirs(os.path.join(self.testDirectory,self.format))
-        self.font.save(outPath)
-    
 
 # start of tests
 def makeIFTWithFormatID(fontFormat, formatId, testName):
-    nft = IFTFile(testName,fontFormat)
+    nft = IFTFile(testName,fontFormat, IFT_FONT_FILENAME)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
     nft.setIFTTableData(bytes(raw))
@@ -249,7 +209,7 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = IFTFile(testName,fontFormat)
+    nft = IFTFile(testName,fontFormat, IFT_FONT_FILENAME)
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -301,7 +261,7 @@ writeTest(
 )
 
 def removeTable(fontFormat, testName, tableTag):
-    nft = IFTFile(testName, fontFormat)
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
     nft.getIFTTableData()
     nft.removeTable(tableTag)
     nft.writeTestIFTFile()

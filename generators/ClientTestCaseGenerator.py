@@ -180,7 +180,7 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
         )
     )
 
-class NFTFile:
+class IFTFile:
     def __init__(self, testName,format):
         self.testName = testName 
         self.format = format
@@ -224,7 +224,7 @@ class NFTFile:
 
 # start of tests
 def makeIFTWithFormatID(fontFormat, formatId, testName):
-    nft = NFTFile(testName,fontFormat)
+    nft = IFTFile(testName,fontFormat)
     raw = nft.getIFTTableData()
     raw[IFT_FORMAT_OFFSET] = formatId
     nft.setIFTTableData(bytes(raw))
@@ -249,7 +249,7 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName): 
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = NFTFile(testName,fontFormat)
+    nft = IFTFile(testName,fontFormat)
     iftData = nft.getIFTTableData()
 
     entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
@@ -301,7 +301,7 @@ writeTest(
 )
 
 def removeTable(fontFormat, testName, tableTag):
-    nft = NFTFile(testName, fontFormat)
+    nft = IFTFile(testName, fontFormat)
     nft.getIFTTableData()
     nft.removeTable(tableTag)
     nft.writeTestIFTFile()

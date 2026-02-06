@@ -21,27 +21,6 @@ def decode_sparse_bitset(data: bytes, base: int = 0) -> List[int]:
 # -----------------------
 # Map entry index to encoder filename
 # -----------------------
-def encoder_filename(entry_index: int) -> str:
-    """
-    Return the actual encoder filename for the given entry index.
-    Modify this mapping to match your encoder output:
-    Examples:
-      0  -> 04.ift_tk
-      1  -> 08.ift_tk
-      2  -> 0C.ift_tk
-      3  -> 0G.ift_tk
-      ...
-      16 -> 1_00.ift_gk
-    """
-    encoder_mapping = [
-        "04.ift_tk","08.ift_tk","0C.ift_tk","0G.ift_tk","0K.ift_tk","0O.ift_tk","0S.ift_tk",
-        "1_00.ift_gk","10.ift_tk","14.ift_tk","18.ift_tk","1C.ift_tk","1G.ift_tk","2_00.ift_gk"
-    ]
-    if entry_index < len(encoder_mapping):
-        return encoder_mapping[entry_index]
-    # fallback: sequential hex if out of mapping
-    return f"{entry_index:02X}.ift_tk"
-
 def read_uint24(data, offset):
     return int.from_bytes(data[offset:offset+3], "big"), offset + 3
 
@@ -124,5 +103,6 @@ def parse_format2_table(data: bytes):
 # -----------------------
 iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
 ift_data = iftFile.getIFTTableData()
+
 
 pprint.pprint(parse_format2_table(ift_data))

@@ -101,10 +101,13 @@ def parse_first_mapping_entry(data: bytes, entries_offset: int):
     # formatFlags (uint8)
     entry["formatFlags"] = data[offset]
     offset += 1
-    print("formatFlags",entry["formatFlags"])
+    print("formatFlags", entry["formatFlags"])
 
-    if not (entry["formatFlags"] & 0x01):
-        # bit 0 is clear → featureCount is present
+    # -----------------------
+    # Bit 0 → featureCount + featureTags + designSpaceCount
+    # -----------------------
+    if entry["formatFlags"] & 0x01:
+        # bit 0 is set → optional fields present
         featureCount = data[offset]
         offset += 1
         tags = []
@@ -112,16 +115,40 @@ def parse_first_mapping_entry(data: bytes, entries_offset: int):
             tags.append(data[offset:offset+4])
             offset += 4
         entry["featureTags"] = tags
-        # check other stuff
-        # Now read designSpaceCount (uint16)
-        if offset + 2 <= len(data):  # make sure enough bytes exist
+
+        # designSpaceCount (uint16)
+        if offset + 2 <= len(data):
             entry["designSpaceCount"] = int.from_bytes(data[offset:offset+2], "big")
             offset += 2
+        else:
+            entry["designSpaceCount"] = 0
     else:
-        # bit 0 is set → skip featureCount / featureTags for now
+        # bit 0 clear → no optional fields
         entry["featureTags"] = []
-        entry["size"] = offset - entries_offset
-        return entry
+        entry["designSpaceCount"] = 0
+
+    # -----------------------
+    # Bit 1 → childEntryMatchModeAndCount
+    # -----------------------
+    if entry["formatFlags"] & 0x02:
+        if offset < len(data):
+            childEntryMatchModeAndCount = data[offset]
+            offset += 1
+            mode = (childEntryMatchModeAndCount & 0x80) >> 7
+            count = childEntryMatchModeAndCount & 0x7F
+            entry["childMatchMode"] = mode
+            entry["childEntryCount"] = count
+        else:
+            entry["childMatchMode"] = None
+            entry["childEntryCount"] = 0
+    else:
+        entry["childMatchMode"] = None
+        entry["childEntryCount"] = 0
+
+    # total size read for this entry
+    entry["size"] = offset - entries_offset
+    return entry
+
 
 # -----------------------
 # Main

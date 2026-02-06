@@ -2,7 +2,7 @@ import sys
 import struct
 import pprint
 from pathlib import Path
-from typing import List, Dict, Union
+from typing import List
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from testCaseGeneratorLib.iftFile import IFTFile
@@ -19,63 +19,52 @@ def decode_sparse_bitset(data: bytes, base: int = 0) -> List[int]:
     return glyphs
 
 # -----------------------
-# Map entry index to encoder filename
+# Helpers
 # -----------------------
 def read_uint24(data, offset):
     return int.from_bytes(data[offset:offset+3], "big"), offset + 3
 
+# -----------------------
+# Parse Format-2 table header
+# -----------------------
 def parse_format2_table(data: bytes):
     offset = 0
-    table_start = 0  # offsets are relative to start of this table
 
-    # uint8 format
     format_ = data[offset]
     offset += 1
 
-    # uint24 reserved
     reserved, offset = read_uint24(data, offset)
 
-    # uint8 flags
     flags = data[offset]
     offset += 1
-
     has_cff = bool(flags & 0x01)
     has_cff2 = bool(flags & 0x02)
 
-    # uint32[4] compatibilityId
     compatibility_ids = struct.unpack_from(">4I", data, offset)
     offset += 16
 
-    # uint8 defaultPatchFormat
     default_patch_format = data[offset]
     offset += 1
 
-    # uint24 entryCount
     entry_count, offset = read_uint24(data, offset)
 
-    # Offset32 entries
     entries_offset = struct.unpack_from(">I", data, offset)[0]
     offset += 4
 
-    # Offset32 entryIdStringData
     entry_id_string_data_offset = struct.unpack_from(">I", data, offset)[0]
     offset += 4
 
-    # uint16 urlTemplateLength
     url_template_length = struct.unpack_from(">H", data, offset)[0]
     offset += 2
 
-    # uint8[urlTemplateLength] urlTemplate
     url_template_bytes = data[offset:offset + url_template_length]
     offset += url_template_length
 
-    # Optional uint32 cffCharStringsOffset
     cff_charstrings_offset = None
     if has_cff:
         cff_charstrings_offset = struct.unpack_from(">I", data, offset)[0]
         offset += 4
 
-    # Optional uint32 cff2CharStringsOffset
     cff2_charstrings_offset = None
     if has_cff2:
         cff2_charstrings_offset = struct.unpack_from(">I", data, offset)[0]
@@ -96,13 +85,54 @@ def parse_format2_table(data: bytes):
         "urlTemplate": url_template_bytes,
         "cffCharStringsOffset": cff_charstrings_offset,
         "cff2CharStringsOffset": cff2_charstrings_offset,
-        "nextOffset": offset,  # where Mapping Entries table begins if sequential
+        "nextOffset": offset,
     }
-# -----------------------
-# Load IFT table
-# -----------------------
-iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
-ift_data = iftFile.getIFTTableData()
 
+# -----------------------
+# Parse the first Mapping Entry only
+# -----------------------
+def parse_first_mapping_entry(data: bytes, entries_offset: int):
+    if entries_offset >= len(data):
+        return {}
 
-pprint.pprint(parse_format2_table(ift_data))
+    offset = entries_offset
+    entry = {}
+
+    # formatFlags (uint8)
+    entry["formatFlags"] = data[offset]
+    offset += 1
+    print("formatFlags",entry["formatFlags"])
+
+    if not (entry["formatFlags"] & 0x01):
+        # bit 0 is clear → featureCount is present
+        featureCount = data[offset]
+        offset += 1
+        tags = []
+        for _ in range(featureCount):
+            tags.append(data[offset:offset+4])
+            offset += 4
+        entry["featureTags"] = tags
+        # check other stuff
+        # Now read designSpaceCount (uint16)
+        if offset + 2 <= len(data):  # make sure enough bytes exist
+            entry["designSpaceCount"] = int.from_bytes(data[offset:offset+2], "big")
+            offset += 2
+    else:
+        # bit 0 is set → skip featureCount / featureTags for now
+        entry["featureTags"] = []
+        entry["size"] = offset - entries_offset
+        return entry
+
+# -----------------------
+# Main
+# -----------------------
+if __name__ == "__main__":
+    iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
+    ift_data = iftFile.getIFTTableData()
+
+    header = parse_format2_table(ift_data)
+    pprint.pprint(header)
+
+    print("\nFirst Mapping Entry:")
+    first_entry = parse_first_mapping_entry(ift_data, header["entriesOffset"])
+    pprint.pprint(first_entry)

@@ -110,19 +110,16 @@ def parse_first_mapping_entry(entryData: bytes, entries_offset: int):
     if formatFlags & 0x01:
         # bit 0 is set → optional fields present
         featureCount = entryData[offset]
+        entry["featureCount"] = featureCount
         offset += 1
         tags = []
         for _ in range(featureCount):
             tags.append(entryData[offset:offset+4])
             offset += 4
         entry["featureTags"] = tags
-
-        # designSpaceCount (uint16)
-        if offset + 2 <= len(entryData):
-            entry["designSpaceCount"] = int.from_bytes(entryData[offset:offset+2], "big")
-            offset += 2
-        else:
-            entry["designSpaceCount"] = 0
+        designSpaceCount = struct.unpack_from(">H", entryData, offset)[0]  # '>H' = big-endian uint16
+        offset += 2  # move past the 2 bytes
+        entry["designSpaceCount"] = designSpaceCount
     else:
         # bit 0 clear → no optional fields
         entry["featureTags"] = []

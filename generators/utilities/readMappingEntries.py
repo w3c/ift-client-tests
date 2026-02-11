@@ -91,7 +91,7 @@ def parse_format2_table(data: bytes):
 # -----------------------
 # Parse the first Mapping Entry only
 # -----------------------
-def parse_first_mapping_entry(entryData: bytes, entries_offset: int):
+def parse_first_mapping_entry(entryData: bytes, entries_offset: int, entryIdStringDataOffset: int):
     if entries_offset >= len(entryData):
         return {}
 
@@ -168,6 +168,8 @@ def parse_first_mapping_entry(entryData: bytes, entries_offset: int):
         entry["childMatchMode"] = None
         entry["childEntryCount"] = 0
 
+
+
     # total size read for this entry
     entry["size"] = offset - entries_offset
     return entry
@@ -184,5 +186,5 @@ if __name__ == "__main__":
     pprint.pprint(header)
 
     print("\nFirst Mapping Entry:")
-    first_entry = parse_first_mapping_entry(ift_data, header["entriesOffset"])
+    first_entry = parse_first_mapping_entry(ift_data, header["entriesOffset"],header["entryIdStringDataOffset"])
     pprint.pprint(first_entry)

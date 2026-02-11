@@ -120,6 +120,31 @@ def parse_first_mapping_entry(entryData: bytes, entries_offset: int):
         designSpaceCount = struct.unpack_from(">H", entryData, offset)[0]  # '>H' = big-endian uint16
         offset += 2  # move past the 2 bytes
         entry["designSpaceCount"] = designSpaceCount
+        # assume offset is at the start of the list
+        entry["designSpace"] = []
+
+        for i in range(designSpaceCount):
+            # read the 4-byte tag
+            tag_bytes = entryData[offset:offset+4]
+            tag = tag_bytes.decode("ascii")  # convert to string
+            offset += 4
+
+            # read 4-byte start (Fixed 16.16)
+            start_raw = struct.unpack_from(">i", entryData, offset)[0]  # big-endian signed int
+            start = start_raw / 65536.0  # convert 16.16 fixed-point to float
+            offset += 4
+
+            # read 4-byte end (Fixed 16.16)
+            end_raw = struct.unpack_from(">i", entryData, offset)[0]
+            end = end_raw / 65536.0
+            offset += 4
+
+            entry["designSpace"].append({
+                "tag": tag,
+                "start": start,
+                "end": end
+            })
+
     else:
         # bit 0 clear → no optional fields
         entry["featureTags"] = []

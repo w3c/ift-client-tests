@@ -91,34 +91,35 @@ def parse_format2_table(data: bytes):
 # -----------------------
 # Parse the first Mapping Entry only
 # -----------------------
-def parse_first_mapping_entry(data: bytes, entries_offset: int):
-    if entries_offset >= len(data):
+def parse_first_mapping_entry(entryData: bytes, entries_offset: int):
+    if entries_offset >= len(entryData):
         return {}
 
     offset = entries_offset
     entry = {}
 
     # formatFlags (uint8)
-    entry["formatFlags"] = data[offset]
+
+    formatFlags = entryData[offset]
+    entry["formatFlags"] = f"{formatFlags:08b}"
     offset += 1
-    print("formatFlags", entry["formatFlags"])
 
     # -----------------------
     # Bit 0 → featureCount + featureTags + designSpaceCount
     # -----------------------
-    if entry["formatFlags"] & 0x01:
+    if formatFlags & 0x01:
         # bit 0 is set → optional fields present
-        featureCount = data[offset]
+        featureCount = entryData[offset]
         offset += 1
         tags = []
         for _ in range(featureCount):
-            tags.append(data[offset:offset+4])
+            tags.append(entryData[offset:offset+4])
             offset += 4
         entry["featureTags"] = tags
 
         # designSpaceCount (uint16)
-        if offset + 2 <= len(data):
-            entry["designSpaceCount"] = int.from_bytes(data[offset:offset+2], "big")
+        if offset + 2 <= len(entryData):
+            entry["designSpaceCount"] = int.from_bytes(entryData[offset:offset+2], "big")
             offset += 2
         else:
             entry["designSpaceCount"] = 0
@@ -130,9 +131,9 @@ def parse_first_mapping_entry(data: bytes, entries_offset: int):
     # -----------------------
     # Bit 1 → childEntryMatchModeAndCount
     # -----------------------
-    if entry["formatFlags"] & 0x02:
-        if offset < len(data):
-            childEntryMatchModeAndCount = data[offset]
+    if formatFlags & 0x02:
+        if offset < len(entryData):
+            childEntryMatchModeAndCount = entryData[offset]
             offset += 1
             mode = (childEntryMatchModeAndCount & 0x80) >> 7
             count = childEntryMatchModeAndCount & 0x7F

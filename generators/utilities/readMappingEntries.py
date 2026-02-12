@@ -18,6 +18,88 @@ def decode_sparse_bitset(data: bytes, base: int = 0) -> List[int]:
                 glyphs.append(base + byte_index * 8 + bit_index)
     return glyphs
 
+import collections
+
+def read_sparse_bit_set(tableData: bytes, offset: int, bias: int):
+    # Read header
+    header = tableData[offset]
+    offset += 1
+
+    # Decode branch factor (B) and height (H)
+    bf_bits = header & 0x03
+    height = (header >> 2) & 0x1F
+
+    # Determine B
+    if bf_bits == 0:
+        B = 2
+    elif bf_bits == 1:
+        B = 4
+    elif bf_bits == 2:
+        B = 8
+    else:
+        B = 32
+
+    # This will store results
+    S = []
+
+    # Case: H == 0 => empty set
+    if height == 0:
+        return S, offset
+
+    # Interpret treeData as a bit stream
+    # LSB first within each byte
+    bit_stream = []
+    byte_index = offset
+    while byte_index < len(tableData):
+        b = tableData[byte_index]
+        for bit in range(8):
+            bit_stream.append((b >> bit) & 1)
+        byte_index += 1
+    # offset is now after header + all treeData consumed
+    offset = byte_index
+
+    # BFS queue: (start, depth)
+    Q = collections.deque()
+    Q.append((0, 1))
+
+    # Step through the tree
+    idx = 0
+    import math
+    max_cp = 0x10FFFF  # max Unicode
+
+    while Q and idx < len(bit_stream):
+        start, depth = Q.popleft()
+
+        # Read B bits
+        bits = bit_stream[idx:idx + B]
+        idx += B
+
+        # If all bits are 0 → entire interval is present
+        if all(v == 0 for v in bits):
+            # interval length = B^(height - depth + 1)
+            length = B ** (height - depth + 1)
+            for x in range(start, start + length):
+                cp = x + bias
+                if cp <= max_cp:
+                    S.append(cp)
+        else:
+            # Process 1-bits
+            for i, v in enumerate(bits):
+                if v == 1:
+                    if depth == height:
+                        # leaf
+                        cp = start + i + bias
+                        if cp <= max_cp:
+                            S.append(cp)
+                    else:
+                        # branch further
+                        next_start = start + (i * (B ** (height - depth)))
+                        Q.append((next_start, depth + 1))
+
+    # Remove duplicates and sort
+    S = sorted(set(S))
+    return S, offset
+
 # -----------------------
 # Helpers
 # -----------------------
@@ -220,6 +302,13 @@ def parse_first_mapping_entry(entryData: bytes, entries_offset: int, entryIdStri
             offset += 2
 
     entry["bias"] = bias
+
+    if formatFlags & 0x30:  # bit 4 or 5
+        codePoints, offset = read_sparse_bit_set(tableData, offset, bias)
+        entry["codePoints"] = codePoints
+    else:
+        entry["codePoints"] = []
+
 
 
     # total size read for this entry

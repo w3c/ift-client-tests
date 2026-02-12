@@ -91,7 +91,7 @@ def parse_format2_table(data: bytes):
 # -----------------------
 # Parse the first Mapping Entry only
 # -----------------------
-def parse_first_mapping_entry(entryData: bytes, entries_offset: int, entryIdStringDataOffset: int):
+def parse_first_mapping_entry(entryData: bytes, entries_offset: int, entryIdStringDataOffset: int,tableData: bytes,):
     if entries_offset >= len(entryData):
         return {}
 
@@ -168,6 +168,58 @@ def parse_first_mapping_entry(entryData: bytes, entries_offset: int, entryIdStri
         entry["childMatchMode"] = None
         entry["childEntryCount"] = 0
 
+    entryIdStringLengths = []
+
+    # Only present if bit 2 set AND entryIdStringDataOffset != 0
+    if (formatFlags & 0x04) and entryIdStringDataOffset != 0:
+
+        string_offset = entryIdStringDataOffset
+
+        while True:
+            raw_len, string_offset = read_uint24(tableData, string_offset)
+
+            # MSB (bit 23) indicates continuation
+            has_more = raw_len & 0x800000
+
+            # Actual length = lower 23 bits
+            length = raw_len & 0x7FFFFF
+
+            entryIdStringLengths.append(length)
+
+            # stop when MSB cleared
+            if not has_more:
+                break
+
+    else:
+        print("Why are we here? bit 2 is not set or entryIdStringDataOffset is 0", entryIdStringDataOffset )
+        # Default case: one string inherited / empty
+        entryIdStringLengths = []
+
+    entry["entryIdStringLengths"] = entryIdStringLengths
+
+    patchFormat = None  # default if not present
+
+    # Check if bit 3 (0x08) of formatFlags is set
+    if formatFlags & 0x08:
+        patchFormat = entryData[offset]  # uint8
+        offset += 1  # advance offset
+
+    entry["patchFormat"] = patchFormat
+
+
+    bias = None  # default if not present
+
+    # Check if bit 5 is set (0x20)
+    if formatFlags & 0x20:
+        if formatFlags & 0x10:
+            # Bit 4 is 1 → bias is uint24
+            bias, offset = read_uint24(entryData, offset)
+        else:
+            # Bit 4 is 0 → bias is uint16
+            bias = int.from_bytes(entryData[offset:offset+2], "big")
+            offset += 2
+
+    entry["bias"] = bias
 
 
     # total size read for this entry
@@ -186,5 +238,5 @@ if __name__ == "__main__":
     pprint.pprint(header)
 
     print("\nFirst Mapping Entry:")
-    first_entry = parse_first_mapping_entry(ift_data, header["entriesOffset"],header["entryIdStringDataOffset"])
+    first_entry = parse_first_mapping_entry(ift_data, header["entriesOffset"],header["entryIdStringDataOffset"],ift_data)
     pprint.pprint(first_entry)

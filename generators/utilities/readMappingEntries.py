@@ -3,33 +3,30 @@ import struct
 import pprint
 from pathlib import Path
 from typing import List
+import collections
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from testCaseGeneratorLib.iftFile import IFTFile
 
-# -----------------------
-# Decode sparse bitset to glyph indices
-# -----------------------
-def decode_sparse_bitset(data: bytes, base: int = 0) -> List[int]:
-    glyphs = []
-    for byte_index, byte_val in enumerate(data):
-        for bit_index in range(8):
-            if byte_val & (1 << (7 - bit_index)):
-                glyphs.append(base + byte_index * 8 + bit_index)
-    return glyphs
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
 
-import collections
+def read_uint24(data, offset):
+    return int.from_bytes(data[offset:offset+3], "big"), offset + 3
+
+
+# --------------------------------------------------
+# Sparse bitset decoder (spec §5.3.2.3)
+# --------------------------------------------------
 
 def read_sparse_bit_set(tableData: bytes, offset: int, bias: int):
-    # Read header
     header = tableData[offset]
     offset += 1
 
-    # Decode branch factor (B) and height (H)
     bf_bits = header & 0x03
     height = (header >> 2) & 0x1F
 
-    # Determine B
     if bf_bits == 0:
         B = 2
     elif bf_bits == 1:
@@ -39,15 +36,11 @@ def read_sparse_bit_set(tableData: bytes, offset: int, bias: int):
     else:
         B = 32
 
-    # This will store results
     S = []
 
-    # Case: H == 0 => empty set
     if height == 0:
         return S, offset
 
-    # Interpret treeData as a bit stream
-    # LSB first within each byte
     bit_stream = []
     byte_index = offset
     while byte_index < len(tableData):
@@ -55,60 +48,45 @@ def read_sparse_bit_set(tableData: bytes, offset: int, bias: int):
         for bit in range(8):
             bit_stream.append((b >> bit) & 1)
         byte_index += 1
-    # offset is now after header + all treeData consumed
+
     offset = byte_index
 
-    # BFS queue: (start, depth)
     Q = collections.deque()
     Q.append((0, 1))
 
-    # Step through the tree
     idx = 0
-    import math
-    max_cp = 0x10FFFF  # max Unicode
+    max_cp = 0x10FFFF
 
     while Q and idx < len(bit_stream):
         start, depth = Q.popleft()
 
-        # Read B bits
-        bits = bit_stream[idx:idx + B]
+        bits = bit_stream[idx:idx+B]
         idx += B
 
-        # If all bits are 0 → entire interval is present
         if all(v == 0 for v in bits):
-            # interval length = B^(height - depth + 1)
             length = B ** (height - depth + 1)
-            for x in range(start, start + length):
+            for x in range(start, start+length):
                 cp = x + bias
                 if cp <= max_cp:
                     S.append(cp)
         else:
-            # Process 1-bits
-            for i, v in enumerate(bits):
+            for i,v in enumerate(bits):
                 if v == 1:
                     if depth == height:
-                        # leaf
-                        cp = start + i + bias
+                        cp = start+i+bias
                         if cp <= max_cp:
                             S.append(cp)
                     else:
-                        # branch further
-                        next_start = start + (i * (B ** (height - depth)))
-                        Q.append((next_start, depth + 1))
+                        next_start = start + (i * (B ** (height-depth)))
+                        Q.append((next_start, depth+1))
 
-    # Remove duplicates and sort
-    S = sorted(set(S))
-    return S, offset
+    return sorted(set(S)), offset
 
-# -----------------------
-# Helpers
-# -----------------------
-def read_uint24(data, offset):
-    return int.from_bytes(data[offset:offset+3], "big"), offset + 3
 
-# -----------------------
-# Parse Format-2 table header
-# -----------------------
+# --------------------------------------------------
+# Format 2 Header
+# --------------------------------------------------
+
 def parse_format2_table(data: bytes):
     offset = 0
 
@@ -119,6 +97,7 @@ def parse_format2_table(data: bytes):
 
     flags = data[offset]
     offset += 1
+
     has_cff = bool(flags & 0x01)
     has_cff2 = bool(flags & 0x02)
 
@@ -139,193 +118,168 @@ def parse_format2_table(data: bytes):
     url_template_length = struct.unpack_from(">H", data, offset)[0]
     offset += 2
 
-    url_template_bytes = data[offset:offset + url_template_length]
+    url_template = data[offset:offset+url_template_length]
     offset += url_template_length
 
-    cff_charstrings_offset = None
+    cff = None
     if has_cff:
-        cff_charstrings_offset = struct.unpack_from(">I", data, offset)[0]
+        cff = struct.unpack_from(">I", data, offset)[0]
         offset += 4
 
-    cff2_charstrings_offset = None
+    cff2 = None
     if has_cff2:
-        cff2_charstrings_offset = struct.unpack_from(">I", data, offset)[0]
+        cff2 = struct.unpack_from(">I", data, offset)[0]
         offset += 4
 
     return {
         "format": format_,
-        "reserved": reserved,
-        "flags": flags,
-        "hasCFF": has_cff,
-        "hasCFF2": has_cff2,
-        "compatibilityId": compatibility_ids,
-        "defaultPatchFormat": default_patch_format,
         "entryCount": entry_count,
         "entriesOffset": entries_offset,
         "entryIdStringDataOffset": entry_id_string_data_offset,
-        "urlTemplateLength": url_template_length,
-        "urlTemplate": url_template_bytes,
-        "cffCharStringsOffset": cff_charstrings_offset,
-        "cff2CharStringsOffset": cff2_charstrings_offset,
-        "nextOffset": offset,
+        "urlTemplate": url_template,
     }
 
-# -----------------------
-# Parse the first Mapping Entry only
-# -----------------------
-def parse_first_mapping_entry(entryData: bytes, entries_offset: int, entryIdStringDataOffset: int,tableData: bytes,):
-    if entries_offset >= len(entryData):
-        return {}
 
-    offset = entries_offset
+# --------------------------------------------------
+# Parse ONE mapping entry
+# --------------------------------------------------
+
+def parse_mapping_entry(data, offset, entryIdStringDataOffset):
+
+    start = offset
     entry = {}
 
-    # formatFlags (uint8)
-
-    formatFlags = entryData[offset]
-    entry["formatFlags"] = f"{formatFlags:08b}"
+    formatFlags = data[offset]
     offset += 1
+    entry["formatFlags"] = f"{formatFlags:08b}"
 
-    # -----------------------
-    # Bit 0 → featureCount + featureTags + designSpaceCount
-    # -----------------------
+    # ---- bit 0 : features + design space
     if formatFlags & 0x01:
-        # bit 0 is set → optional fields present
-        featureCount = entryData[offset]
-        entry["featureCount"] = featureCount
+        featureCount = data[offset]
         offset += 1
+
         tags = []
         for _ in range(featureCount):
-            tags.append(entryData[offset:offset+4])
+            tags.append(data[offset:offset+4].decode("ascii", errors="replace"))
             offset += 4
+
         entry["featureTags"] = tags
-        designSpaceCount = struct.unpack_from(">H", entryData, offset)[0]  # '>H' = big-endian uint16
-        offset += 2  # move past the 2 bytes
-        entry["designSpaceCount"] = designSpaceCount
-        # assume offset is at the start of the list
+
+        designSpaceCount = struct.unpack_from(">H", data, offset)[0]
+        offset += 2
+
+        ds = []
+        for _ in range(designSpaceCount):
+            tag = data[offset:offset+4].decode("ascii", errors="replace")
+            offset += 4
+            start_raw = struct.unpack_from(">i", data, offset)[0]
+            offset += 4
+            end_raw = struct.unpack_from(">i", data, offset)[0]
+            offset += 4
+            ds.append({"tag":tag,"start":start_raw/65536,"end":end_raw/65536})
+
+        entry["designSpace"] = ds
+    else:
+        entry["featureTags"] = []
         entry["designSpace"] = []
 
-        for i in range(designSpaceCount):
-            # read the 4-byte tag
-            tag_bytes = entryData[offset:offset+4]
-            tag = tag_bytes.decode("ascii")  # convert to string
-            offset += 4
-
-            # read 4-byte start (Fixed 16.16)
-            start_raw = struct.unpack_from(">i", entryData, offset)[0]  # big-endian signed int
-            start = start_raw / 65536.0  # convert 16.16 fixed-point to float
-            offset += 4
-
-            # read 4-byte end (Fixed 16.16)
-            end_raw = struct.unpack_from(">i", entryData, offset)[0]
-            end = end_raw / 65536.0
-            offset += 4
-
-            entry["designSpace"].append({
-                "tag": tag,
-                "start": start,
-                "end": end
-            })
-
-    else:
-        # bit 0 clear → no optional fields
-        entry["featureTags"] = []
-        entry["designSpaceCount"] = 0
-
-    # -----------------------
-    # Bit 1 → childEntryMatchModeAndCount
-    # -----------------------
+    # ---- bit 1 : child entries
     if formatFlags & 0x02:
-        if offset < len(entryData):
-            childEntryMatchModeAndCount = entryData[offset]
-            offset += 1
-            mode = (childEntryMatchModeAndCount & 0x80) >> 7
-            count = childEntryMatchModeAndCount & 0x7F
-            entry["childMatchMode"] = mode
-            entry["childEntryCount"] = count
-        else:
-            entry["childMatchMode"] = None
-            entry["childEntryCount"] = 0
+        b = data[offset]
+        offset += 1
+        entry["childMatchMode"] = (b>>7)&1
+        count = b & 0x7F
+
+        indices = []
+        for _ in range(count):
+            v, offset = read_uint24(data, offset)
+            indices.append(v)
+
+        entry["childEntryIndices"] = indices
     else:
-        entry["childMatchMode"] = None
-        entry["childEntryCount"] = 0
+        entry["childEntryIndices"] = []
 
-    entryIdStringLengths = []
-
-    # Only present if bit 2 set AND entryIdStringDataOffset != 0
+    # ---- bit 2 : entryIdStringLengths
+    lengths = []
     if (formatFlags & 0x04) and entryIdStringDataOffset != 0:
-
-        string_offset = entryIdStringDataOffset
-
+        ptr = entryIdStringDataOffset
         while True:
-            raw_len, string_offset = read_uint24(tableData, string_offset)
-
-            # MSB (bit 23) indicates continuation
-            has_more = raw_len & 0x800000
-
-            # Actual length = lower 23 bits
-            length = raw_len & 0x7FFFFF
-
-            entryIdStringLengths.append(length)
-
-            # stop when MSB cleared
-            if not has_more:
+            raw, ptr = read_uint24(data, ptr)
+            lengths.append(raw & 0x7FFFFF)
+            if not (raw & 0x800000):
                 break
 
-    else:
-        print("Why are we here? bit 2 is not set or entryIdStringDataOffset is 0", entryIdStringDataOffset )
-        # Default case: one string inherited / empty
-        entryIdStringLengths = []
+    entry["entryIdStringLengths"] = lengths
 
-    entry["entryIdStringLengths"] = entryIdStringLengths
-
-    patchFormat = None  # default if not present
-
-    # Check if bit 3 (0x08) of formatFlags is set
+    # ---- bit 3 : patchFormat
     if formatFlags & 0x08:
-        patchFormat = entryData[offset]  # uint8
-        offset += 1  # advance offset
+        entry["patchFormat"] = data[offset]
+        offset += 1
+    else:
+        entry["patchFormat"] = None
 
-    entry["patchFormat"] = patchFormat
-
-
-    bias = None  # default if not present
-
-    # Check if bit 5 is set (0x20)
+    # ---- bits 4/5 : bias + sparse set
+    bias = 0
     if formatFlags & 0x20:
         if formatFlags & 0x10:
-            # Bit 4 is 1 → bias is uint24
-            bias, offset = read_uint24(entryData, offset)
+            bias, offset = read_uint24(data, offset)
         else:
-            # Bit 4 is 0 → bias is uint16
-            bias = int.from_bytes(entryData[offset:offset+2], "big")
+            bias = struct.unpack_from(">H", data, offset)[0]
             offset += 2
 
     entry["bias"] = bias
 
-    if formatFlags & 0x30:  # bit 4 or 5
-        codePoints, offset = read_sparse_bit_set(tableData, offset, bias)
-        entry["codePoints"] = codePoints
+    if formatFlags & 0x30:
+        cps, offset = read_sparse_bit_set(data, offset, bias)
+        entry["codePoints"] = cps
     else:
         entry["codePoints"] = []
 
+    entry["size"] = offset-start
+    return entry, offset
 
 
-    # total size read for this entry
-    entry["size"] = offset - entries_offset
-    return entry
+# --------------------------------------------------
+# Parse ALL mapping entries
+# --------------------------------------------------
+
+def parse_mapping_entries(data, header):
+
+    entries = []
+    offset = header["entriesOffset"]
+
+    for i in range(header["entryCount"]):
+        if offset >= len(data):
+            break
+
+        entry, offset = parse_mapping_entry(
+            data,
+            offset,
+            header["entryIdStringDataOffset"]
+        )
+
+        entry["index"] = i
+        entries.append(entry)
+
+    return entries
 
 
-# -----------------------
+# --------------------------------------------------
 # Main
-# -----------------------
-if __name__ == "__main__":
-    iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
-    ift_data = iftFile.getIFTTableData()
+# --------------------------------------------------
 
-    header = parse_format2_table(ift_data)
+if __name__ == "__main__":
+
+    iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
+    data = iftFile.getIFTTableData()
+
+    header = parse_format2_table(data)
     pprint.pprint(header)
 
-    print("\nFirst Mapping Entry:")
-    first_entry = parse_first_mapping_entry(ift_data, header["entriesOffset"],header["entryIdStringDataOffset"],ift_data)
-    pprint.pprint(first_entry)
+    print("\nMapping Entries:\n")
+
+    entries = parse_mapping_entries(data, header)
+
+    for e in entries:
+        pprint.pprint(e)
+        print("--------------")

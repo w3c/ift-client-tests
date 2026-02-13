@@ -11,15 +11,12 @@ from testCaseGeneratorLib.iftFile import IFTFile
 # --------------------------------------------------
 # Helpers
 # --------------------------------------------------
-
 def read_uint24(data, offset):
     return int.from_bytes(data[offset:offset+3], "big"), offset + 3
-
 
 # --------------------------------------------------
 # Sparse bitset decoder (spec §5.3.2.3)
 # --------------------------------------------------
-
 def read_sparse_bit_set(tableData: bytes, offset: int, bias: int):
     header = tableData[offset]
     offset += 1
@@ -82,11 +79,9 @@ def read_sparse_bit_set(tableData: bytes, offset: int, bias: int):
 
     return sorted(set(S)), offset
 
-
 # --------------------------------------------------
 # Format 2 Header
 # --------------------------------------------------
-
 def parse_format2_table(data: bytes):
     offset = 0
 
@@ -139,11 +134,9 @@ def parse_format2_table(data: bytes):
         "urlTemplate": url_template,
     }
 
-
 # --------------------------------------------------
 # Parse ONE mapping entry
 # --------------------------------------------------
-
 def parse_mapping_entry(data, offset, entryIdStringDataOffset):
 
     start = offset
@@ -162,7 +155,6 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
         for _ in range(featureCount):
             tags.append(data[offset:offset+4].decode("ascii", errors="replace"))
             offset += 4
-
         entry["featureTags"] = tags
 
         designSpaceCount = struct.unpack_from(">H", data, offset)[0]
@@ -177,7 +169,6 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
             end_raw = struct.unpack_from(">i", data, offset)[0]
             offset += 4
             ds.append({"tag":tag,"start":start_raw/65536,"end":end_raw/65536})
-
         entry["designSpace"] = ds
     else:
         entry["featureTags"] = []
@@ -194,7 +185,6 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
         for _ in range(count):
             v, offset = read_uint24(data, offset)
             indices.append(v)
-
         entry["childEntryIndices"] = indices
     else:
         entry["childEntryIndices"] = []
@@ -208,7 +198,6 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
             lengths.append(raw & 0x7FFFFF)
             if not (raw & 0x800000):
                 break
-
     entry["entryIdStringLengths"] = lengths
 
     # ---- bit 3 : patchFormat
@@ -226,7 +215,6 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
         else:
             bias = struct.unpack_from(">H", data, offset)[0]
             offset += 2
-
     entry["bias"] = bias
 
     if formatFlags & 0x30:
@@ -235,39 +223,37 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
     else:
         entry["codePoints"] = []
 
+    # ---- Determine table-keyed vs glyph-keyed
+    entry["tableKeyed"] = False
+    if entry["patchFormat"] is not None and not entry["codePoints"]:
+        entry["tableKeyed"] = True
+
     entry["size"] = offset-start
     return entry, offset
-
 
 # --------------------------------------------------
 # Parse ALL mapping entries
 # --------------------------------------------------
-
 def parse_mapping_entries(data, header):
-
     entries = []
     offset = header["entriesOffset"]
 
     for i in range(header["entryCount"]):
         if offset >= len(data):
             break
-
         entry, offset = parse_mapping_entry(
             data,
             offset,
             header["entryIdStringDataOffset"]
         )
-
         entry["index"] = i
         entries.append(entry)
 
     return entries
 
-
 # --------------------------------------------------
 # Main
 # --------------------------------------------------
-
 if __name__ == "__main__":
 
     iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
@@ -277,9 +263,7 @@ if __name__ == "__main__":
     pprint.pprint(header)
 
     print("\nMapping Entries:\n")
-
     entries = parse_mapping_entries(data, header)
-
     for e in entries:
         pprint.pprint(e)
         print("--------------")

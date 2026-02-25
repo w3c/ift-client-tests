@@ -4,6 +4,7 @@ import pprint
 from pathlib import Path
 from typing import List
 import collections
+from fontTools.ttLib import TTFont
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from testCaseGeneratorLib.iftFile import IFTFile
@@ -255,10 +256,11 @@ def parse_mapping_entries(data, header):
 # Main
 # --------------------------------------------------
 if __name__ == "__main__":
-
-    iftFile = IFTFile("exampleTestFile", "GLYF", "myfont-mod.ift.woff2")
-    data = iftFile.getIFTTableData()
-
+    fontFile = "../resources/IFT/GLYF/font.ift.woff2"
+    # fontFile = "./resources/Roboto-IFT.woff2"
+    font = TTFont(fontFile)
+    tbl = font["IFT "] 
+    data = bytearray(tbl.data)
     header = parse_format2_table(data)
     pprint.pprint(header)
 

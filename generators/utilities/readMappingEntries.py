@@ -157,7 +157,8 @@ def parse_mapping_entry(data, offset, entryIdStringDataOffset):
             tags.append(data[offset:offset+4].decode("ascii", errors="replace"))
             offset += 4
         entry["featureTags"] = tags
-
+        print("offset before unpack:", offset)
+        print("bytes remaining:", len(data) - offset)
         designSpaceCount = struct.unpack_from(">H", data, offset)[0]
         offset += 2
 
@@ -256,8 +257,8 @@ def parse_mapping_entries(data, header):
 # Main
 # --------------------------------------------------
 if __name__ == "__main__":
-    fontFile = "../resources/IFT/GLYF/font.ift.woff2"
-    # fontFile = "./resources/Roboto-IFT.woff2"
+    # fontFile = "../resources/IFT/GLYF/font.ift.woff2"
+    fontFile = "./resources/Roboto-IFT.woff2"
     font = TTFont(fontFile)
     tbl = font["IFT "] 
     data = bytearray(tbl.data)

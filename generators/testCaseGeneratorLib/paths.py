@@ -25,17 +25,22 @@ mainDirectory = dirname(mainDirectory, 2)
 
 # directory for test case resources,
 resourcesDirectory = os.path.join(mainDirectory, "generators", "resources")
+
 # directory for source font file
-TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","glyf.ttf") 
-CFFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","cff.otf") 
+TTFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","glyf.ttf")
+CFFSourcePath = os.path.join(mainDirectory,"generators","sourceFonts","cff.otf")
+
+# directory for built files
+buildDirectory = os.path.join(mainDirectory,"build")
+
 # directory for subsetted font files
-subsetFontPath = os.path.join(mainDirectory,"generators","subsettedFonts") 
+subsetFontPath = os.path.join(buildDirectory,"subsettedFonts")
 # fallback font path
 fallbackFontPath = os.path.join(subsetFontPath, "glyf-fallback.ttf")
 # directories for test output
 fontsDirectory = os.path.join(mainDirectory, "client","fonts")
 # directory for subset fonts
-subsetDirectory = os.path.join(mainDirectory,"generators", "subsettedFonts")
+subsetDirectory = os.path.join(buildDirectory, "subsettedFonts")
 fallbackDirectory = os.path.join(fontsDirectory, "fallback")
 
 clientDirectory = os.path.join(mainDirectory, "IFTClient")

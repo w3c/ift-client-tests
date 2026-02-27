@@ -25,12 +25,3 @@ http_archive(
     strip_prefix = "brotli-71fe6cac061ac62c0241f410fbd43a04a6b4f303",
     url = "https://github.com/google/brotli/archive/71fe6cac061ac62c0241f410fbd43a04a6b4f303.zip",
 )
-
-# Harfbuzz
-http_archive(
-    name = "harfbuzz",
-    build_file = "//third_party:harfbuzz.BUILD",
-    integrity = "sha256-LwhLlBZXpUZKSXuC/wc0X2jNTkALysLYVxL7vHGG2R0=",
-    strip_prefix = "harfbuzz-87bbb9fadf45ee04c7425d7e8f22072fdd827edb",
-    urls = ["https://github.com/harfbuzz/harfbuzz/archive/87bbb9fadf45ee04c7425d7e8f22072fdd827edb.zip"],
-)

@@ -2,15 +2,15 @@ import os
 import glob
 import shutil
 from fontTools.ttLib import TTFont
-from testCaseGeneratorLib.paths import resourcesDirectory,  clientTestDirectory
+from testCaseGeneratorLib.paths import resourcesDirectory,  clientTestDirectory, buildDirectory
 
 class IFTFile:
     def __init__(self, testName,format,fontFileName):
-        self.testName = testName 
+        self.testName = testName
         self.format = format
         self.fontFileName = fontFileName
         self.testDirectory = os.path.join(clientTestDirectory, testName)
-        self.sourceFontPath = os.path.join(resourcesDirectory, "IFT", format, "font.ift.woff2")
+        self.sourceFontPath = os.path.join(buildDirectory, "IFT", format, "font.ift.woff2")
         self.font = TTFont(self.sourceFontPath)
         self.createTestDirectory()
         self.copyIFTSourceFiles()
@@ -19,7 +19,7 @@ class IFTFile:
             os.makedirs(self.testDirectory)
     def copyIFTSourceFiles(self):
         # Copy _gk and _tk files from resources/IFT/ to testDirectory
-        sourceDir = os.path.join(resourcesDirectory, "IFT",self.format)
+        sourceDir = os.path.join(buildDirectory, "IFT",self.format)
         destDir = os.path.join(self.testDirectory,self.format)
         if not os.path.exists(destDir):
             os.makedirs(destDir)

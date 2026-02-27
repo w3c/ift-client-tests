@@ -1,3 +1,4 @@
 covered-test-plan-ids.txt
-test-plan-coverage-report.txt
+test-coverage-report.txt
 IFTClient/
+build/

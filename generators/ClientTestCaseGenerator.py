@@ -30,7 +30,7 @@ from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clie
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
 
-# IFT Table Header Offsets 
+# IFT Table Header Offsets
 IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29
 IFT_FORMAT_OFFSET = 0
@@ -204,10 +204,10 @@ writeTest(
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithFormatID,
-    funcArgs=(3, identifierString) 
+    funcArgs=(3, identifierString)
 )
 
-def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName): 
+def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName):
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
     nft = IFTFile(testName,fontFormat, IFT_FONT_FILENAME)
     iftData = nft.getIFTTableData()
@@ -241,11 +241,11 @@ def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName):
             invalidEndFixed = int(-1 * (1 << 16))  # negative 16.16 fixed
             entriesData[endOffset:endOffset+4] = struct.pack(">i", invalidEndFixed)
     iftData = bytearray(iftData[:entriesOffset]) + entriesData
-    nft.setIFTTableData(bytes(iftData)) 
+    nft.setIFTTableData(bytes(iftData))
     # Write back
     nft.writeTestIFTFile()
 
-testTag = "conform-design-space-segment-end-invalid-value"
+testTag = "conform-design-space-segment-end-valid-value"
 identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF","CFF"]
 writeTest(
@@ -266,7 +266,7 @@ def removeTable(fontFormat, testName, tableTag):
     nft.removeTable(tableTag)
     nft.writeTestIFTFile()
 
-testTag = "conform-require-ift-table"
+testTag = "extend-font-subset_require-ift-table"
 identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF","CFF"]
 writeTest(

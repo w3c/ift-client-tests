@@ -2,8 +2,4 @@
 *~
 Cargo.lock
 MODULE.bazel.lock
-build/
 bazel-*
-fonts/
-config/glyf_segmentation_plan.txtpb
-config/cff_segmentation_plan.txtpb  

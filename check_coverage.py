@@ -21,7 +21,7 @@ class ConformanceStatementFinder(HTMLParser):
     self.conformance_ids = set()
 
   def handle_starttag(self, tag, attrs):
-    if tag != "span":
+    if tag != "span" and tag != "h3" and tag != "h4" and tag != "h5":
       return
 
     attr_map = {a[0]: a[1] for a in attrs}

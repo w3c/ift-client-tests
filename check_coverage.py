@@ -110,24 +110,22 @@ def run(spec_html_path, test_html_path):
   # Section 1 tests that are missing coverage
   untested_ids = (spec_ids | spec_algorithm_ids) - tested_ids
   if len(untested_ids) > 0:
-    print("Conformance statements in Spec that are not tested:")
+    print("# Conformance statements in Spec that are not tested:")
     for i in untested_ids:
-      print(i)
-  print("")
+      print(f"UNTESTED {i}")
 
 
-  print("Algorithm test coverage:")
+  print("# Algorithm test coverage:")
   for id, count in algorithm_coverage.items():
     if count > 0:
-      print(f"{id}: {count} tests")
-  print("")
+      print(f"TEST_COUNT {id} {count}")
 
   missing_from_spec = tested_ids - spec_ids - spec_algorithm_ids
 
   if len(missing_from_spec) > 0:
-    print("Tested IDs that are not in the spec:")
+    print("# Tested IDs that are not in the spec:")
     for i in missing_from_spec:
-      print(i)
+      print(f"NOT_IN_SPEC {i}")
 
 
 if __name__ == '__main__':

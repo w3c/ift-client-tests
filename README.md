@@ -30,6 +30,17 @@ make test-coverage-report.txt
 To generate test coverage reports (test-coverage-report.txt) that specify which specification client
 conformance statements are covered and not covered.
 
+## Manage GitHub Issues
+
+You can automatically create and close GitHub issues for untested and tested conformance statements by running the included utility on the coverage report:
+
+```bash
+# From the repository root
+python3 update_github_issues.py test-coverage-report.txt
+```
+
+Note: To apply the changes to the GitHub repository without rate-limits and with the required permissions, set the `GITHUB_TOKEN` environment variable. You can use the `--dry-run` flag to preview the actions.
+
 ## Generate Client Tests
 
 Client tests have the following dependencies:

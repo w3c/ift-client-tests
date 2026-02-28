@@ -114,6 +114,12 @@ def run(spec_html_path, test_html_path):
     for i in untested_ids:
       print(f"UNTESTED {i}")
 
+  tested_spec_ids = (spec_ids | spec_algorithm_ids) & tested_ids
+  if len(tested_spec_ids) > 0:
+    print("# Conformance statements in Spec that are tested:")
+    for i in tested_spec_ids:
+      print(f"TESTED {i}")
+
 
   print("# Algorithm test coverage:")
   for id, count in algorithm_coverage.items():

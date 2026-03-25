@@ -281,6 +281,44 @@ writeTest(
     funcArgs=(identifierString,"IFT ",)
 )
 
+def makeIFTWithInvalidTableKeyedPatchFormat(fontFormat, testName):
+    """Modify all table keyed patch files to have an invalid format tag.
+
+    Per the spec (§6.2 Table Keyed), the format field of a table keyed patch
+    must be set to 'iftk'. This test sets it to 'XXXX' so the client should
+    reject the patch during step 2 of Apply table keyed patch.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    # Modify all _tk patch files in the test directory to have an invalid format tag
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkFile in glob.glob(os.path.join(destDir, "*_tk")):
+        with open(tkFile, "rb") as f:
+            data = bytearray(f.read())
+        # The first 4 bytes are the format Tag, which must be 'iftk'.
+        # Replace with an invalid value.
+        data[0:4] = b'XXXX'
+        with open(tkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-table-keyed-format-equals-iftk"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch with invalid format tag",
+    description="The table keyed patch format field is set to an invalid value (not 'iftk'). The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Dileep Maurya", role="author", link="https://github.com/dmaurya-edge")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithInvalidTableKeyedPatchFormat,
+    funcArgs=(identifierString,)
+)
+
 
 # ------------------
 # Generate the Index

@@ -319,6 +319,59 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def makeIFTWithUnsortedTableKeyedPatchOffsets(fontFormat, testName):
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+    nft.writeTestIFTFile()
+
+    # Modify the _tk patch files in the test directory to have unsorted offsets
+    tkDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkPath in glob.glob(os.path.join(tkDir, "*_tk")):
+        with open(tkPath, "rb") as f:
+            data = bytearray(f.read())
+
+        # Table keyed patch layout:
+        #   0: format (Tag, 4 bytes)
+        #   4: reserved (uint32, 4 bytes)
+        #   8: compatibilityId (uint32[4], 16 bytes)
+        #  24: patchesCount (uint16, 2 bytes)
+        #  26: patches (Offset32[patchesCount+1], 4 bytes each)
+        patchesCount = struct.unpack(">H", data[24:26])[0]
+        numOffsets = patchesCount + 1
+        if numOffsets < 2:
+            continue
+
+        offsetsStart = 26
+        offsets = []
+        for i in range(numOffsets):
+            pos = offsetsStart + i * 4
+            offsets.append(struct.unpack(">I", data[pos:pos+4])[0])
+
+        # Reverse the offsets so they are no longer in ascending order
+        offsets.reverse()
+
+        for i in range(numOffsets):
+            pos = offsetsStart + i * 4
+            data[pos:pos+4] = struct.pack(">I", offsets[i])
+
+        with open(tkPath, "wb") as f:
+            f.write(data)
+
+testTag = "conform-table-keyed-patches-sort-ascending"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch with unsorted offsets",
+    description="The patches offsets array in the table keyed patch is not sorted in ascending order.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsortedTableKeyedPatchOffsets,
+    funcArgs=(identifierString,)
+)
+
 
 # ------------------
 # Generate the Index

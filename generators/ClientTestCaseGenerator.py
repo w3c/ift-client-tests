@@ -29,13 +29,13 @@ from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clie
                           clientTestResourcesDirectory, fallbackFontPath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
-
-# IFT Table Header Offsets
-IFT_ENTRIES_OFFSET_START = 25
-IFT_ENTRIES_OFFSET_END = 29
-IFT_FORMAT_OFFSET = 0
-# Other constants
-IFT_FONT_FILENAME = "myfont-mod.ift.woff2"
+from testCaseGeneratorLib.constants import (
+    IFT_ENTRIES_OFFSET_END,
+    IFT_ENTRIES_OFFSET_START,
+    IFT_FONT_FILENAME,
+    IFT_FORMAT_OFFSET,
+)
+from testCaseGeneratorLib.utils import replace_format2_url_template
 
 # ------------------
 # Directory Creation
@@ -372,6 +372,87 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def madeIFTwithInvalidOpCodeInURLTemplate(fontFormat, testName, url_template_bytes):
+    """Embed invalid URL template bytes per negative examples in §5.3.3 URL Templates."""
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    iftData = nft.getIFTTableData()
+    iftData = replace_format2_url_template(iftData, bytes(url_template_bytes))
+    nft.setIFTTableData(bytes(iftData))
+    nft.writeTestIFTFile()
+
+# https://www.w3.org/TR/IFT/#example-305f10ca example of negative tests
+_url_template_negative_tests = [
+    (
+        "invalid-opcode-150",
+        "URL template with invalid op code 150",
+        "Expand URL Template must return an error when the template contains op code 150 (not in the op code table).",
+        [4, *map(ord, "foo/"), 150],
+    ),
+    (
+        "opcode-zero",
+        "URL template with invalid literal op code 0",
+        "Expand URL Template must return an error when a literal op code requests 0 bytes (op code 0 is invalid).",
+        [4, *map(ord, "foo/"), 0, 128],
+    ),
+    (
+        "literal-insufficient-bytes",
+        "URL template with literal op code requesting too few bytes",
+        "Expand URL Template must return an error when a literal op code requests 10 bytes but fewer remain in the template.",
+        [10, *map(ord, "foo/"), 128],
+    ),
+    (
+        "literal-invalid-utf8",
+        "URL template with invalid UTF-8 literal",
+        "Expand URL Template must return an error when literal bytes are not valid UTF-8.",
+        [4, *map(ord, "foo/"), 0x85, 128],
+    ),
+]
+
+for suffix, title, description, template_bytes in _url_template_negative_tests:
+    identifier_string = "%s-url-templates_%s" % (testType, suffix)
+    writeTest(
+        identifier=identifier_string,
+        title=title,
+        description=description,
+        shouldShowIFT=False,
+        credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+        specLink="#url-templates",
+        fontFormats=["GLYF", "CFF"],
+        func=madeIFTwithInvalidOpCodeInURLTemplate,
+        funcArgs=(identifier_string, bytes(template_bytes)),
+    )
+
+
+def madeIFTWithCustomURLTemplate(fontFormat, testName):
+    custom_url_template = [8, *map(ord, "patches/"), 128, 7, *map(ord, ".ift_tk")]
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    iftData = nft.getIFTTableData()
+    iftData = replace_format2_url_template(iftData, bytes(custom_url_template))
+    nft.setIFTTableData(bytes(iftData))
+    nft.writeTestIFTFile()
+
+    # create the /patches directory 
+    if not os.path.exists(os.path.join(nft.testDirectory, fontFormat, "patches")):
+        os.makedirs(os.path.join(nft.testDirectory, fontFormat, "patches"))
+    # move the *.ift_tk file to the /patches directory
+    for file in glob.glob(os.path.join(nft.testDirectory, fontFormat, "*.ift_tk")):
+        shutil.move(file, os.path.join(nft.testDirectory, fontFormat, "patches", os.path.basename(file)))
+
+testTag = "conform-url-templates-custom"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Custom URL template",
+    description="The URL template is set to a custom value.",
+    shouldShowIFT=True,
+    credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=madeIFTWithCustomURLTemplate,
+    funcArgs=(identifierString,)
+)
 
 # ------------------
 # Generate the Index

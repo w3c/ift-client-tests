@@ -21,6 +21,7 @@ writeTest function.
 
 import os
 import glob
+import base64
 import shutil
 import struct
 import zipfile
@@ -373,6 +374,127 @@ writeTest(
 )
 
 
+# ------------------------------------
+# URL Template Helpers
+# ------------------------------------
+
+def decode_id32_to_int(id32_str):
+    """
+    Decode a base32hex string (no padding, per spec §5.3.3) to an integer.
+
+    Base32hex uses alphabet 0-9, A-V (RFC 4648 §7).
+    Examples: '04' -> 1,  '08' -> 2,  '0C' -> 3,  '0G' -> 4
+    """
+    alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUV'
+    id32_str = id32_str.upper()
+    n_chars = len(id32_str)
+    value = 0
+    for c in id32_str:
+        value = value * 32 + alphabet.index(c)
+    # Strip trailing padding bits that were added during encoding.
+    # Encoding pads the last group to 5 bits; we strip those extra bits here.
+    n_bits = 5 * n_chars
+    padding_bits = n_bits % 8
+    if padding_bits:
+        value >>= (8 - padding_bits)
+    return value
+
+
+def id32_no_strip(entry_id_int):
+    """
+    Encode an integer as base32hex WITHOUT stripping leading zero bytes.
+
+    The spec (conform-entry-id-must-be-converted) requires leading zeros to be
+    stripped. This helper deliberately omits that step, producing the 'wrong'
+    encoding used in negative tests that verify clients strip leading zeros.
+    Example: integer 1 -> big-endian [0x00, 0x00, 0x00, 0x01] -> '0000008'
+             (correct encoding strips to [0x01] -> '04')
+    """
+    # Always use 4 bytes (big-endian 32-bit), no stripping
+    b = entry_id_int.to_bytes(4, 'big')
+    alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUV'
+    result = ''
+    bits = 0
+    num_bits = 0
+    for byte in b:
+        bits = (bits << 8) | byte
+        num_bits += 8
+        while num_bits >= 5:
+            num_bits -= 5
+            result += alphabet[(bits >> num_bits) & 0x1F]
+    if num_bits > 0:
+        result += alphabet[(bits << (5 - num_bits)) & 0x1F]
+    return result
+
+
+def compute_id64_file_name(entry_id_int):
+    """
+    Compute the base64url patch file name for an integer entry ID (id64 opcode).
+
+    Per the spec (conform-entry-id-converted): integer -> big-endian 32-bit ->
+    strip leading zero bytes -> base64url encode. Returns the raw base64url
+    string with actual '=' padding chars (not '%3D'), suitable for use as a
+    file name. The HTTP server decodes '%3D' in client requests to '=' before
+    looking up the file.
+    Per conform-equal-sign-encoded, clients must request 'AQ%3D%3D.ift_tk'
+    (URL-encoding '='), while the file on disk is named 'AQ==.ift_tk'.
+    """
+    if entry_id_int == 0:
+        b = bytes([0])
+    else:
+        # Convert to big-endian 32-bit, strip leading zero bytes
+        raw = entry_id_int.to_bytes(4, 'big').lstrip(b'\x00')
+        b = raw if raw else bytes([0])
+    return base64.urlsafe_b64encode(b).decode('ascii')  # includes actual '='
+
+def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
+    """
+    Rename patch files to use the un-stripped (wrong) id32 encoding, then verify
+    that a correct client (which DOES strip leading zeros) cannot find them.
+
+    Tests conform-entry-id-must-be-converted: 'When entry ID is an unsigned integer
+    it must first be converted to a big endian 32 bit unsigned integer, but then all
+    leading bytes that are equal to 0 are removed before encoding.'
+
+    Patches are renamed from the correctly-stripped id32 names (e.g. '04.ift_tk'
+    for entry 1) to the incorrectly un-stripped 4-byte id32 names (e.g.
+    '0000008.ift_tk' for entry 1). A conforming client computes '04.ift_tk' for
+    entry 1, which no longer exists, so it cannot load the font.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()  # load but do not modify the IFT table
+
+    dest_dir = os.path.join(nft.testDirectory, fontFormat)
+    # Rename each *.ift_tk from its correct id32 name to the un-stripped variant
+    for old_path in glob.glob(os.path.join(dest_dir, "*_tk")):
+        old_basename = os.path.basename(old_path)
+        id32_part = old_basename.replace(".ift_tk", "")
+        # Only rename files whose names are valid base32hex (id32-encoded)
+        if not all(c in "0123456789ABCDEFGHIJKLMNOPQRSTUV" for c in id32_part.upper()):
+            continue
+        entry_id = decode_id32_to_int(id32_part)
+        wrong_name = id32_no_strip(entry_id) + ".ift_tk"
+        shutil.move(old_path, os.path.join(dest_dir, wrong_name))
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-entry-id-must-be-converted"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="URL template id32 must strip leading zero bytes from integer entry IDs",
+    description="Patch files are stored at the un-stripped base32hex names "
+                "(e.g. '0000008.ift_tk' for entry 1). A conforming client strips "
+                "leading zero bytes and looks for '04.ift_tk', which does not exist, "
+                "so the IFT font cannot be loaded.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnstrippedId32PatchNames,
+    funcArgs=(identifierString,)
+)
 # ------------------
 # Generate the Index
 # ------------------

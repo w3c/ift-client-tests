@@ -372,6 +372,71 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def makeIFTWithDuplicateGlyphKeyedTables(fontFormat, testName):
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    # Modify all _gk patch files in the test directory
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # Glyph keyed patch header layout:
+        #   0-3:   format (Tag, 4 bytes) = 'ifgk'
+        #   4-7:   reserved (uint32, 4 bytes)
+        #   8:     flags (uint8, 1 byte)
+        #   9-24:  compatibilityId (uint32[4], 16 bytes)
+        #   25-28: maxUncompressedLength (uint32, 4 bytes)
+        #   29+:   brotliStream (variable)
+        flags = data[8]
+        brotli_data = bytes(data[29:])
+        decompressed = bytearray(brotli.decompress(brotli_data))
+
+        # GlyphPatches layout:
+        #   0-3:  glyphCount (uint32)
+        #   4:    tableCount (uint8)
+        #   5+:   glyphIds[glyphCount] (uint16 or uint24 each)
+        #   then: tables[tableCount] (Tag, 4 bytes each)
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+        use_uint24 = flags & 1
+        gid_size = 3 if use_uint24 else 2
+
+        # Calculate offset to tables array
+        tables_offset = 5 + glyph_count * gid_size
+        first_tag = decompressed[tables_offset:tables_offset + 4]
+
+        # Set tableCount to 2 and insert a duplicate of the first tag
+        decompressed[4] = 2
+        decompressed[tables_offset + 4:tables_offset + 4] = first_tag
+
+        # Re-compress and write back
+        recompressed = brotli.compress(bytes(decompressed))
+        struct.pack_into(">I", data, 25, len(decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-tables-sort-ascending-unique"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with duplicate table tags",
+    description="The glyph keyed patch tables array contains duplicate values. The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Dileep Maurya", role="author", link="https://github.com/dmaurya-edge")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithDuplicateGlyphKeyedTables,
+    funcArgs=(identifierString,)
+)
 
 # ------------------
 # Generate the Index

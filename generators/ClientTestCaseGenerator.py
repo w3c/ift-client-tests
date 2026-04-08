@@ -491,27 +491,6 @@ def id32_no_strip(entry_id_int):
         result += alphabet[(bits << (5 - num_bits)) & 0x1F]
     return result
 
-
-def compute_id64_file_name(entry_id_int):
-    """
-    Compute the base64url patch file name for an integer entry ID (id64 opcode).
-
-    Per the spec (conform-entry-id-converted): integer -> big-endian 32-bit ->
-    strip leading zero bytes -> base64url encode. Returns the raw base64url
-    string with actual '=' padding chars (not '%3D'), suitable for use as a
-    file name. The HTTP server decodes '%3D' in client requests to '=' before
-    looking up the file.
-    Per conform-equal-sign-encoded, clients must request 'AQ%3D%3D.ift_tk'
-    (URL-encoding '='), while the file on disk is named 'AQ==.ift_tk'.
-    """
-    if entry_id_int == 0:
-        b = bytes([0])
-    else:
-        # Convert to big-endian 32-bit, strip leading zero bytes
-        raw = entry_id_int.to_bytes(4, 'big').lstrip(b'\x00')
-        b = raw if raw else bytes([0])
-    return base64.urlsafe_b64encode(b).decode('ascii')  # includes actual '='
-
 def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
     """
     Rename patch files to use the un-stripped (wrong) id32 encoding, then verify

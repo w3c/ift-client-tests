@@ -12,6 +12,8 @@ class IFTFile:
         self.testDirectory = os.path.join(clientTestDirectory, testName)
         self.sourceFontPath = os.path.join(buildDirectory, "IFT", format, "font.ift.woff2")
         self.font = TTFont(self.sourceFontPath)
+        self.tbl = None
+        self.raw = None
         self.createTestDirectory()
         self.copyIFTSourceFiles()
     def createTestDirectory(self):

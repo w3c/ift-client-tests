@@ -21,7 +21,6 @@ writeTest function.
 
 import os
 import glob
-import base64
 import shutil
 import struct
 import zipfile

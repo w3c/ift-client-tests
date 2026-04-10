@@ -2,7 +2,7 @@ import os
 import glob
 import shutil
 from fontTools.ttLib import TTFont
-from testCaseGeneratorLib.paths import resourcesDirectory,  clientTestDirectory, buildDirectory
+from testCaseGeneratorLib.paths import clientTestDirectory, buildDirectory
 
 class IFTFile:
     def __init__(self, testName,format,fontFileName):
@@ -38,12 +38,10 @@ class IFTFile:
         return self.raw
     def setIFTTableData(self, data):
         self.raw = bytearray(data)
+        if self.tbl is not None:
+            self.tbl.data = bytes(self.raw)
     def removeTable(self,tableTag):
         del self.font[tableTag]
     def writeTestIFTFile(self):
-        if self.tbl and self.raw:
-            self.tbl.data = bytes(self.raw)
-        outPath = os.path.join(self.testDirectory,self.format,  self.fontFileName)
-        if not os.path.exists(os.path.join(self.testDirectory,self.format)):
-            os.makedirs(os.path.join(self.testDirectory,self.format))
+        outPath = os.path.join(self.testDirectory, self.format, self.fontFileName)
         self.font.save(outPath)

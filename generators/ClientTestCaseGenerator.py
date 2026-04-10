@@ -392,7 +392,6 @@ def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
     entry 1, which no longer exists, so it cannot load the font.
     """
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
-    nft.getIFTTableData()  # load but do not modify the IFT table
 
     dest_dir = os.path.join(nft.testDirectory, fontFormat)
     # Rename each *.ift_tk from its correct id32 name to the un-stripped variant

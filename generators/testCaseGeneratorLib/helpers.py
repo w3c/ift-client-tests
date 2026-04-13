@@ -2,6 +2,9 @@
 # URL Template Helpers
 # ------------------------------------
 
+import base64
+
+
 def decode_id32_to_int(id32_str):
     """
     Decode a base32hex string (no padding, per spec §5.3.3) to an integer.
@@ -20,7 +23,7 @@ def decode_id32_to_int(id32_str):
     n_bits = 5 * n_chars
     padding_bits = n_bits % 8
     if padding_bits:
-        value >>= (8 - padding_bits)
+        value >>= padding_bits
     return value
 
 
@@ -49,3 +52,21 @@ def id32_no_strip(entry_id_int):
     if num_bits > 0:
         result += alphabet[(bits << (5 - num_bits)) & 0x1F]
     return result
+
+
+def compute_id64_file_name(entry_id_int):
+    """
+    Compute the base64url patch file name for an integer entry ID (id64 opcode).
+
+    Per the spec (conform-entry-id-converted): integer -> big-endian 32-bit ->
+    strip leading zero bytes -> base64url encode. Returns the raw base64url
+    string with actual '=' padding chars (not '%3D'), suitable for use as a
+    file name on disk. The HTTP server decodes a client's '%3D'-encoded request
+    back to '=' before looking up the file.
+    """
+    if entry_id_int == 0:
+        b = bytes([0])
+    else:
+        raw = entry_id_int.to_bytes(4, 'big').lstrip(b'\x00')
+        b = raw if raw else bytes([0])
+    return base64.urlsafe_b64encode(b).decode('ascii')

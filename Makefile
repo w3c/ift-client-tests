@@ -26,7 +26,7 @@ build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf &: 
 
 build/config/glyf_segmentation_plan.txtpb: build/subsettedFonts/glyf-ift.ttf encoder/config/segmentation_config.txtpb
 	mkdir -p build/config/
-	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:closure_glyph_keyed_segmenter_util -- \
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
 	      --input_font=$(CURDIR)/build/subsettedFonts/glyf-ift.ttf \
 	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
 	      --nooutput_segmentation_analysis \
@@ -35,7 +35,7 @@ build/config/glyf_segmentation_plan.txtpb: build/subsettedFonts/glyf-ift.ttf enc
 
 build/config/cff_segmentation_plan.txtpb: build/subsettedFonts/cff-ift.otf encoder/config/segmentation_config.txtpb
 	mkdir -p build/config/
-	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:closure_glyph_keyed_segmenter_util -- \
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
 	      --input_font=$(CURDIR)/build/subsettedFonts/cff-ift.otf \
 	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
 	      --nooutput_segmentation_analysis \

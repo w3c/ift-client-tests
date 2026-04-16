@@ -38,14 +38,19 @@ from testCaseGeneratorLib.iftFile import IFTFile
 from testCaseGeneratorLib.helpers import (
     decode_id32_to_int,
     id32_no_strip,
-    replace_format2_url_template
+    replace_format2_url_template,
+    compute_id64_file_name
 )
-
 
 # IFT Table Header Offsets
 IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29
 IFT_FORMAT_OFFSET = 0
+# URL Template offsets (Format 2 fixed header layout):
+# format(1) + reserved(3) + flags(1) + compatibilityId(16) +
+# defaultPatchFormat(1) + entryCount(3) + entriesOffset(4) +
+# entryIdStringDataOffset(4) + urlTemplateLength(2) + urlTemplate[...]
+IFT_URL_TEMPLATE_OFFSET = 35
 # Other constants
 IFT_FONT_FILENAME = "myfont-mod.ift.woff2"
 
@@ -572,6 +577,65 @@ writeTest(
     func=madeIFTWithCustomURLTemplate,
     funcArgs=(identifierString,)
 )
+
+def makeIFTWithId64OpcodeRenamedPatches(fontFormat, testName):
+    """
+    Switch the URL template opcode to id64 (0x85) and rename patch files to
+    use base64url names with '=' padding (e.g. 'AQ==.ift_tk' for entry 1).
+
+    Tests conform-equal-sign-encoded: 'Because the padding character is =,
+    it must be URL-encoded as %3D.'
+
+    A conforming client:
+      1. Computes the id64 name for entry 1: [0x01] -> base64url -> 'AQ=='
+      2. URL-encodes '=' as '%3D' -> requests 'AQ%3D%3D.ift_tk'
+      3. The static server decodes '%3D' -> '=' and serves 'AQ==.ift_tk'
+      4. The IFT font loads successfully.
+
+    This is a positive test (shouldShowIFT=True): a conforming client can load
+    the font, so 'P' renders as PASS via the IFT font. A non-conforming client
+    that requests 'AQ==.ift_tk' directly also resolves to the same file on a
+    standard server, so this test primarily validates the id64 opcode path
+    end-to-end.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+    # Change opcode from 0x80 (Insert id32) to 0x85 (Insert id64)
+    raw[IFT_URL_TEMPLATE_OFFSET] = 0x85
+    nft.setIFTTableData(bytes(raw))
+
+    # Rename *.ift_tk files from id32 names to id64 names (with '=' padding)
+    dest_dir = os.path.join(nft.testDirectory, fontFormat)
+    for old_path in glob.glob(os.path.join(dest_dir, "*_tk")):
+        old_basename = os.path.basename(old_path)
+        id32_part = old_basename.replace(".ift_tk", "")
+        if not all(c in "0123456789ABCDEFGHIJKLMNOPQRSTUV" for c in id32_part.upper()):
+            continue
+        entry_id = decode_id32_to_int(id32_part)
+        id64_name = compute_id64_file_name(entry_id) + ".ift_tk"
+        shutil.move(old_path, os.path.join(dest_dir, id64_name))
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-equal-sign-encoded"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="URL template id64 base64url '=' padding must be URL-encoded as %3D",
+    description="The URL template uses the id64 opcode (0x85). Patch files are "
+                "named with base64url '=' padding (e.g. 'AQ==.ift_tk' for entry 1). "
+                "A conforming client URL-encodes '=' as '%3D' and requests "
+                "'AQ%3D%3D.ift_tk'. The server decodes '%3D' to '=' and serves "
+                "'AQ==.ift_tk', allowing the IFT font to load successfully.",
+    shouldShowIFT=True,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithId64OpcodeRenamedPatches,
+    funcArgs=(identifierString,)
+)
+
 # ------------------
 # Generate the Index
 # ------------------

@@ -25,17 +25,29 @@ import shutil
 import struct
 import zipfile
 from fontTools.ttLib import TTFont
-from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, fallbackFontPath
+from testCaseGeneratorLib.paths import (
+    resourcesDirectory,
+    clientDirectory,
+    clientTestDirectory,
+    clientTestResourcesDirectory,
+    fallbackFontPath,
+    buildDirectory
+)
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
-from testCaseGeneratorLib.constants import (
-    IFT_ENTRIES_OFFSET_END,
-    IFT_ENTRIES_OFFSET_START,
-    IFT_FONT_FILENAME,
-    IFT_FORMAT_OFFSET,
+from testCaseGeneratorLib.helpers import (
+    decode_id32_to_int,
+    id32_no_strip,
+    replace_format2_url_template
 )
-from testCaseGeneratorLib.utils import replace_format2_url_template
+
+
+# IFT Table Header Offsets
+IFT_ENTRIES_OFFSET_START = 25
+IFT_ENTRIES_OFFSET_END = 29
+IFT_FORMAT_OFFSET = 0
+# Other constants
+IFT_FONT_FILENAME = "myfont-mod.ift.woff2"
 
 # ------------------
 # Directory Creation
@@ -372,6 +384,120 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def makeIFTWithDuplicateGlyphKeyedTables(fontFormat, testName):
+    import brotli
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    # Modify all _gk patch files in the test directory
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # Glyph keyed patch header layout:
+        #   0-3:   format (Tag, 4 bytes) = 'ifgk'
+        #   4-7:   reserved (uint32, 4 bytes)
+        #   8:     flags (uint8, 1 byte)
+        #   9-24:  compatibilityId (uint32[4], 16 bytes)
+        #   25-28: maxUncompressedLength (uint32, 4 bytes)
+        #   29+:   brotliStream (variable)
+        flags = data[8]
+        brotli_data = bytes(data[29:])
+        decompressed = bytearray(brotli.decompress(brotli_data))
+
+        # GlyphPatches layout:
+        #   0-3:  glyphCount (uint32)
+        #   4:    tableCount (uint8)
+        #   5+:   glyphIds[glyphCount] (uint16 or uint24 each)
+        #   then: tables[tableCount] (Tag, 4 bytes each)
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+        use_uint24 = flags & 1
+        gid_size = 3 if use_uint24 else 2
+
+        # Calculate offset to tables array
+        tables_offset = 5 + glyph_count * gid_size
+        first_tag = decompressed[tables_offset:tables_offset + 4]
+
+        # Set tableCount to 2 and insert a duplicate of the first tag
+        decompressed[4] = 2
+        decompressed[tables_offset + 4:tables_offset + 4] = first_tag
+
+        # Re-compress and write back
+        recompressed = brotli.compress(bytes(decompressed))
+        struct.pack_into(">I", data, 25, len(decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-tables-sort-ascending-unique"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with duplicate table tags",
+    description="The glyph keyed patch tables array contains duplicate values. The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Dileep Maurya", role="author", link="https://github.com/dmaurya-edge")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithDuplicateGlyphKeyedTables,
+    funcArgs=(identifierString,)
+)
+
+
+
+def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
+    """
+    Rename patch files to use the un-stripped (wrong) id32 encoding, then verify
+    that a correct client (which DOES strip leading zeros) cannot find them.
+
+    Tests conform-entry-id-must-be-converted: 'When entry ID is an unsigned integer
+    it must first be converted to a big endian 32 bit unsigned integer, but then all
+    leading bytes that are equal to 0 are removed before encoding.'
+
+    Patches are renamed from the correctly-stripped id32 names (e.g. '04.ift_tk'
+    for entry 1) to the incorrectly un-stripped 4-byte id32 names (e.g.
+    '0000008.ift_tk' for entry 1). A conforming client computes '04.ift_tk' for
+    entry 1, which no longer exists, so it cannot load the font.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    dest_dir = os.path.join(nft.testDirectory, fontFormat)
+    # Rename each *.ift_tk from its correct id32 name to the un-stripped variant
+    for old_path in glob.glob(os.path.join(dest_dir, "*_tk")):
+        old_basename = os.path.basename(old_path)
+        id32_part = old_basename.replace(".ift_tk", "")
+        # Only rename files whose names are valid base32hex (id32-encoded)
+        if not all(c in "0123456789ABCDEFGHIJKLMNOPQRSTUV" for c in id32_part.upper()):
+            continue
+        entry_id = decode_id32_to_int(id32_part)
+        wrong_name = id32_no_strip(entry_id) + ".ift_tk"
+        shutil.move(old_path, os.path.join(dest_dir, wrong_name))
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-entry-id-must-be-converted"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="URL template id32 must strip leading zero bytes from integer entry IDs",
+    description="Patch files are stored at the un-stripped base32hex names "
+                "(e.g. '0000008.ift_tk' for entry 1). A conforming client strips "
+                "leading zero bytes and looks for '04.ift_tk', which does not exist, "
+                "so the IFT font cannot be loaded.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnstrippedId32PatchNames,
+    funcArgs=(identifierString,)
+)
 
 def madeIFTwithInvalidOpCodeInURLTemplate(fontFormat, testName, url_template_bytes):
     """Embed invalid URL template bytes per negative examples in §5.3.3 URL Templates."""
@@ -425,23 +551,16 @@ for suffix, title, description, template_bytes in _url_template_negative_tests:
 
 
 def madeIFTWithCustomURLTemplate(fontFormat, testName):
-    custom_url_template = [8, *map(ord, "patches/"), 128, 7, *map(ord, ".ift_tk")]
-    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
-    iftData = nft.getIFTTableData()
-    iftData = replace_format2_url_template(iftData, bytes(custom_url_template))
-    nft.setIFTTableData(bytes(iftData))
-    nft.writeTestIFTFile()
+    # copy build/URL_TEMPLATE/IFT/{fontFormat} to test directory if not exists
+    if not os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat)):
+        shutil.copytree(os.path.join(buildDirectory, "URL_TEMPLATE", "IFT", fontFormat), os.path.join(clientTestDirectory, testName, fontFormat))
+    # rename the font.ift.woff2 file to myfont-mod.ift.woff2 if exists
+    if os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2")):
+        os.rename(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2"), os.path.join(clientTestDirectory, testName, fontFormat, "myfont-mod.ift.woff2"))
 
-    # create the /patches directory 
-    if not os.path.exists(os.path.join(nft.testDirectory, fontFormat, "patches")):
-        os.makedirs(os.path.join(nft.testDirectory, fontFormat, "patches"))
-    # move the *.ift_tk file to the /patches directory
-    for file in glob.glob(os.path.join(nft.testDirectory, fontFormat, "*.ift_tk")):
-        shutil.move(file, os.path.join(nft.testDirectory, fontFormat, "patches", os.path.basename(file)))
-
-testTag = "conform-url-templates-custom"
+testTag = "conform-custom-url-template-prefix"
 identifierString= "%s-%s" % (testType, testTag)
-fontFormats = ["GLYF","CFF"]
+fontFormats = ["GLYF", "CFF"]
 writeTest(
     identifier=identifierString,
     title="Custom URL template",
@@ -453,7 +572,6 @@ writeTest(
     func=madeIFTWithCustomURLTemplate,
     funcArgs=(identifierString,)
 )
-
 # ------------------
 # Generate the Index
 # ------------------

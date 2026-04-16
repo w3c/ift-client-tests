@@ -13,6 +13,7 @@ tests: IFTClient/Tests/xhtml1/index.html
 
 IFTClient/Tests/xhtml1/index.html: \
 	build/IFT/GLYF/font.ift.woff2 build/IFT/CFF/font.ift.woff2 \
+	build/URL_TEMPLATE/IFT/GLYF/font.ift.woff2 build/URL_TEMPLATE/IFT/CFF/font.ift.woff2 \
 	build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf
 	cd generators/; python3 ./ClientTestCaseGenerator.py
 
@@ -26,7 +27,7 @@ build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf &: 
 
 build/config/glyf_segmentation_plan.txtpb: build/subsettedFonts/glyf-ift.ttf encoder/config/segmentation_config.txtpb
 	mkdir -p build/config/
-	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:closure_glyph_keyed_segmenter_util -- \
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
 	      --input_font=$(CURDIR)/build/subsettedFonts/glyf-ift.ttf \
 	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
 	      --nooutput_segmentation_analysis \
@@ -35,7 +36,7 @@ build/config/glyf_segmentation_plan.txtpb: build/subsettedFonts/glyf-ift.ttf enc
 
 build/config/cff_segmentation_plan.txtpb: build/subsettedFonts/cff-ift.otf encoder/config/segmentation_config.txtpb
 	mkdir -p build/config/
-	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:closure_glyph_keyed_segmenter_util -- \
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
 	      --input_font=$(CURDIR)/build/subsettedFonts/cff-ift.otf \
 	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
 	      --nooutput_segmentation_analysis \
@@ -56,6 +57,26 @@ build/IFT/CFF/font.ift.woff2: build/config/cff_segmentation_plan.txtpb build/sub
 		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift.otf \
 		--plan=$(CURDIR)/build/config/cff_segmentation_plan.txtpb \
 		--output_path=$(CURDIR)/build/IFT/CFF \
+		--output_font="font.ift.woff2"
+
+build/URL_TEMPLATE/IFT/GLYF/font.ift.woff2: build/config/glyf_segmentation_plan.txtpb build/subsettedFonts/glyf-ift.ttf
+	mkdir -p build/URL_TEMPLATE/IFT/GLYF/patches
+	cp build/config/glyf_segmentation_plan.txtpb build/URL_TEMPLATE/IFT/GLYF/glyf_segmentation_plan.txtpb
+	echo -e "advanced_settings {\n  override_url_template_prefix: \"\\x08patches/\\x80\"\n}" >> build/URL_TEMPLATE/IFT/GLYF/glyf_segmentation_plan.txtpb
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/subsettedFonts/glyf-ift.ttf \
+		--plan=$(CURDIR)/build/URL_TEMPLATE/IFT/GLYF/glyf_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/URL_TEMPLATE/IFT/GLYF \
+		--output_font="font.ift.woff2"
+
+build/URL_TEMPLATE/IFT/CFF/font.ift.woff2: build/config/cff_segmentation_plan.txtpb build/subsettedFonts/cff-ift.otf
+	mkdir -p build/URL_TEMPLATE/IFT/CFF/patches
+	cp build/config/cff_segmentation_plan.txtpb build/URL_TEMPLATE/IFT/CFF/cff_segmentation_plan.txtpb
+	echo -e "advanced_settings {\n  override_url_template_prefix: \"\\x08patches/\\x80\"\n}" >> build/URL_TEMPLATE/IFT/CFF/cff_segmentation_plan.txtpb
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift.otf \
+		--plan=$(CURDIR)/build/URL_TEMPLATE/IFT/CFF/cff_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/URL_TEMPLATE/IFT/CFF \
 		--output_font="font.ift.woff2"
 
 clean:

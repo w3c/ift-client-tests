@@ -558,16 +558,16 @@ def madeIFTWithCustomURLTemplate(fontFormat, testName):
     if os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2")):
         os.rename(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2"), os.path.join(clientTestDirectory, testName, fontFormat, "myfont-mod.ift.woff2"))
 
-testTag = "conform-custom-url-template-prefix"
+testTag = "url-template-prefix"
 identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF", "CFF"]
 writeTest(
     identifier=identifierString,
-    title="Custom URL template",
-    description="The URL template is set to a custom value.",
+    title="Override URL template prefix",
+    description=f"The URL template prefix is overridden to a custom value. For example, setting the url template prefix to '\\x08patches/\\x80'will cause the client to look for patches(.ift_tk and .ift_gk) in the 'patches' directory in relative to the font.ift.woff2 file.",
     shouldShowIFT=True,
     credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
-    specLink="#%s" % identifierString,
+    specLink="#url-templates",
     fontFormats=fontFormats,
     func=madeIFTWithCustomURLTemplate,
     funcArgs=(identifierString,)

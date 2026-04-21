@@ -554,6 +554,82 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def makeIFTWithUnsortedGlyphIds(fontFormat, testName):
+    """
+    Reverse the glyphIds array inside each glyph-keyed patch file so that
+    the glyph IDs are no longer in ascending sorted order.
+
+    Tests conform-glyph-keyed-glyph-ids-sort-ascending-unique:
+    'Must be in ascending sorted order and must not contain any duplicate values.'
+
+    GlyphPatches layout (after brotli decompression):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24, per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[...]
+      then:  glyphData[...]
+    """
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # Outer header: format(4) reserved(4) flags(1) compatibilityId(16)
+        #               maxUncompressedLength(4) brotliStream(...)
+        flags = data[8]
+        brotli_data = bytes(data[29:])
+        decompressed = bytearray(brotli.decompress(brotli_data))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        gid_size = 3 if (flags & 1) else 2
+
+        assert glyph_count >= 2, (
+            f"{gkFile}: glyph_count={glyph_count}, need at least 2 to reverse glyphIds. "
+            "The source glyph-keyed patch must contain multiple glyphs for this test."
+        )
+
+        # Read all glyph IDs
+        gids = [
+            int.from_bytes(decompressed[5 + i * gid_size:5 + i * gid_size + gid_size], 'big')
+            for i in range(glyph_count)
+        ]
+        # Reverse so they are no longer in ascending order
+        gids.reverse()
+        for i, gid in enumerate(gids):
+            decompressed[5 + i * gid_size:5 + i * gid_size + gid_size] = gid.to_bytes(gid_size, 'big')
+
+        recompressed = brotli.compress(bytes(decompressed))
+        struct.pack_into(">I", data, 25, len(decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-glyph-ids-sort-ascending-unique"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with unsorted glyph IDs",
+    description="The glyphIds array in the glyph keyed patch is reversed so the "
+                "glyph IDs are no longer in ascending sorted order. The client must "
+                "reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsortedGlyphIds,
+    funcArgs=(identifierString,)
+)
+
 # ------------------
 # Generate the Index
 # ------------------

@@ -446,7 +446,6 @@ writeTest(
 )
 
 
-
 def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
     """
     Rename patch files to use the un-stripped (wrong) id32 encoding, then verify
@@ -551,6 +550,85 @@ writeTest(
     specLink="#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithId64OpcodeRenamedPatches,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithUnsortedGlyphDataOffsets(fontFormat, testName):
+    """
+    Reverse the glyphDataOffsets array inside each glyph-keyed patch file so
+    that the offsets are no longer in ascending order.
+
+    Tests conform-glyph-keyed-glyph-data-offsets-sort-ascending:
+    'Offsets must be sorted in ascending order.'
+
+    GlyphPatches layout (after brotli decompression):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24, per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[glyphCount * tableCount + 1] (Offset32 each)
+      then:  glyphData[variable]
+    """
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # Outer header: format(4) reserved(4) flags(1) compatibilityId(16)
+        #               maxUncompressedLength(4) brotliStream(...)
+        flags = data[8]
+        brotli_data = bytes(data[29:])
+        decompressed = bytearray(brotli.decompress(brotli_data))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+        gid_size = 3 if (flags & 1) else 2
+
+        # Navigate to glyphDataOffsets
+        tables_offset = 5 + glyph_count * gid_size
+        glyph_data_offsets_offset = tables_offset + table_count * 4
+        num_offsets = glyph_count * table_count + 1
+
+        if num_offsets >= 2:
+            # Read all offsets
+            offsets = [
+                struct.unpack(">I", decompressed[glyph_data_offsets_offset + i * 4:
+                                                 glyph_data_offsets_offset + i * 4 + 4])[0]
+                for i in range(num_offsets)
+            ]
+            # Reverse so they are no longer ascending
+            offsets.reverse()
+            for i, off in enumerate(offsets):
+                struct.pack_into(">I", decompressed,
+                                 glyph_data_offsets_offset + i * 4, off)
+
+        recompressed = brotli.compress(bytes(decompressed))
+        struct.pack_into(">I", data, 25, len(decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-glyph-data-offsets-sort-ascending"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with unsorted glyphDataOffsets",
+    description="The glyphDataOffsets array in the glyph keyed patch is reversed so the "
+                "offsets are no longer in ascending order. The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsortedGlyphDataOffsets,
     funcArgs=(identifierString,)
 )
 

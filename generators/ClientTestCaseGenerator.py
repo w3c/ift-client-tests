@@ -446,7 +446,6 @@ writeTest(
 )
 
 
-
 def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
     """
     Rename patch files to use the un-stripped (wrong) id32 encoding, then verify
@@ -553,6 +552,7 @@ writeTest(
     func=makeIFTWithId64OpcodeRenamedPatches,
     funcArgs=(identifierString,)
 )
+
 
 def makeIFTWithUnsortedGlyphDataOffsets(fontFormat, testName):
     """

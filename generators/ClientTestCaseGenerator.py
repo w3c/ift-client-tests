@@ -789,6 +789,122 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def _find_and_corrupt_sparse_bit_set(iftData):
+    """
+    Navigate Format 2 IFT table entries to find the first codePoints sparse bit set,
+    then corrupt its header byte so that H exceeds the maximum height for the
+    given branch factor.
+
+    Per §sparse-bit-set-decoding step 2: 'If H is greater than the Maximum Height
+    in the Branch Factor Encoding table in the row for B then the encoding is invalid,
+    return an error.'
+
+    Branch Factor Encoding (spec §sparse-bit-set-decoding):
+      bits 0-1 = 0b00 → B=2,  maxH=31
+      bits 0-1 = 0b01 → B=4,  maxH=16
+      bits 0-1 = 0b10 → B=8,  maxH=11
+      bits 0-1 = 0b11 → B=32, maxH=7
+    """
+    iftData = bytearray(iftData)
+    entry_id_string_data_offset = int.from_bytes(iftData[29:33], 'big')
+    entries_offset = int.from_bytes(iftData[25:29], 'big')
+    entry_count = int.from_bytes(iftData[22:25], 'big')
+
+    offset = entries_offset
+    for _ in range(entry_count):
+        format_flags = iftData[offset]
+        offset += 1
+
+        # bit 0: featureCount + featureTags + designSpaceCount + designSpaceSegments
+        if format_flags & 0x01:
+            feature_count = iftData[offset]
+            offset += 1 + feature_count * 4  # featureCount byte + featureTags (4 bytes each)
+            design_space_count = int.from_bytes(iftData[offset:offset + 2], 'big')
+            offset += 2 + design_space_count * 12  # designSpaceCount uint16 + segments (12 bytes each)
+
+        # bit 1: childEntryMatchModeAndCount + childEntryIndices
+        if format_flags & 0x02:
+            child_entry_match_mode_and_count = iftData[offset]
+            offset += 1
+            child_entry_count = child_entry_match_mode_and_count & 0x7F
+            offset += child_entry_count * 3  # uint24 each
+
+        # bit 2: entryIdDelta (variable int24, LSB continuation) or entryIdStringLength
+        if format_flags & 0x04:
+            if entry_id_string_data_offset == 0:
+                # entryIdDelta: LSB set means another delta follows
+                while True:
+                    delta = int.from_bytes(iftData[offset:offset + 3], 'big')
+                    offset += 3
+                    if not (delta & 0x01):
+                        break
+            else:
+                # entryIdStringLength: MSB set means another length follows
+                while True:
+                    length_val = int.from_bytes(iftData[offset:offset + 3], 'big')
+                    offset += 3
+                    if not (length_val & 0x800000):
+                        break
+
+        # bit 3: patchFormat (1 byte)
+        if format_flags & 0x08:
+            offset += 1
+
+        # bits 4 and/or 5: bias (if bit 5 set) then codePoints sparse bit set
+        if format_flags & 0x30:
+            if format_flags & 0x20:  # bit 5: bias present
+                if format_flags & 0x10:  # bits 4+5: uint24 bias
+                    offset += 3
+                else:                    # bit 5 only: uint16 bias
+                    offset += 2
+
+            # Corrupt the sparse bit set header byte
+            header_byte = iftData[offset]
+            branch_factor_bits = header_byte & 0x03
+            max_heights = {0: 31, 1: 16, 2: 11, 3: 7}
+            max_h = max_heights[branch_factor_bits]
+            # Set H = max_h + 1 (invalid). H occupies bits 2-6 (5 bits).
+            invalid_h = (max_h + 1) & 0x1F
+            iftData[offset] = (header_byte & 0x03) | (invalid_h << 2)
+            return bytes(iftData)
+
+    raise ValueError("No codePoints (sparse bit set) field found in any mapping entry")
+
+
+def makeIFTWithInvalidSparseBitSet(fontFormat, testName):
+    """
+    Corrupt the first codePoints sparse bit set in the IFT table so that its
+    height H exceeds the maximum allowed for the encoded branch factor.
+
+    Tests conform-sparse-bit-set-decoding: if the decoding algorithm returns
+    an error the client must treat the patch map as invalid and not apply any
+    patches, causing the IFT font to fail to render.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+    corrupted = _find_and_corrupt_sparse_bit_set(bytes(raw))
+    nft.setIFTTableData(corrupted)
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-sparse-bit-set-decoding"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Sparse bit set with height exceeding maximum for branch factor",
+    description="The codePoints sparse bit set in a mapping entry has a height H that "
+                "exceeds the maximum allowed for its branch factor. The client must treat "
+                "the patch map as invalid and not render using the IFT font.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithInvalidSparseBitSet,
+    funcArgs=(identifierString,)
+)
+
 # ------------------
 # Generate the Index
 # ------------------

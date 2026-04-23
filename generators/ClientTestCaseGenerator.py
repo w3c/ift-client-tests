@@ -25,12 +25,22 @@ import shutil
 import struct
 import zipfile
 from fontTools.ttLib import TTFont
-from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, fallbackFontPath
+from testCaseGeneratorLib.paths import (
+    resourcesDirectory,
+    clientDirectory,
+    clientTestDirectory,
+    clientTestResourcesDirectory,
+    fallbackFontPath,
+    buildDirectory
+)
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
-from testCaseGeneratorLib.helpers import decode_id32_to_int, id32_no_strip, compute_id64_file_name
-
+from testCaseGeneratorLib.helpers import (
+    decode_id32_to_int,
+    id32_no_strip,
+    replace_format2_url_template,
+    compute_id64_file_name
+)
 
 # IFT Table Header Offsets
 IFT_ENTRIES_OFFSET_START = 25
@@ -381,7 +391,6 @@ writeTest(
 
 def makeIFTWithDuplicateGlyphKeyedTables(fontFormat, testName):
     import brotli
-
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
     nft.getIFTTableData()
 
@@ -494,6 +503,79 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def madeIFTwithInvalidOpCodeInURLTemplate(fontFormat, testName, url_template_bytes):
+    """Embed invalid URL template bytes per negative examples in §5.3.3 URL Templates."""
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    iftData = nft.getIFTTableData()
+    iftData = replace_format2_url_template(iftData, bytes(url_template_bytes))
+    nft.setIFTTableData(bytes(iftData))
+    nft.writeTestIFTFile()
+
+# https://www.w3.org/TR/IFT/#example-305f10ca example of negative tests
+_url_template_negative_tests = [
+    (
+        "invalid-opcode-150",
+        "URL template with invalid op code 150",
+        "Expand URL Template must return an error when the template contains op code 150 (not in the op code table).",
+        [4, *map(ord, "foo/"), 150],
+    ),
+    (
+        "opcode-zero",
+        "URL template with invalid literal op code 0",
+        "Expand URL Template must return an error when a literal op code requests 0 bytes (op code 0 is invalid).",
+        [4, *map(ord, "foo/"), 0, 128],
+    ),
+    (
+        "literal-insufficient-bytes",
+        "URL template with literal op code requesting too few bytes",
+        "Expand URL Template must return an error when a literal op code requests 10 bytes but fewer remain in the template.",
+        [10, *map(ord, "foo/"), 128],
+    ),
+    (
+        "literal-invalid-utf8",
+        "URL template with invalid UTF-8 literal",
+        "Expand URL Template must return an error when literal bytes are not valid UTF-8.",
+        [4, *map(ord, "foo/"), 0x85, 128],
+    ),
+]
+
+for suffix, title, description, template_bytes in _url_template_negative_tests:
+    identifier_string = "%s-url-templates_%s" % (testType, suffix)
+    writeTest(
+        identifier=identifier_string,
+        title=title,
+        description=description,
+        shouldShowIFT=False,
+        credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+        specLink="#url-templates",
+        fontFormats=["GLYF", "CFF"],
+        func=madeIFTwithInvalidOpCodeInURLTemplate,
+        funcArgs=(identifier_string, bytes(template_bytes)),
+    )
+
+
+def madeIFTWithCustomURLTemplate(fontFormat, testName):
+    # copy build/URL_TEMPLATE/IFT/{fontFormat} to test directory if not exists
+    if not os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat)):
+        shutil.copytree(os.path.join(buildDirectory, "URL_TEMPLATE", "IFT", fontFormat), os.path.join(clientTestDirectory, testName, fontFormat))
+    # rename the font.ift.woff2 file to myfont-mod.ift.woff2 if exists
+    if os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2")):
+        os.rename(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2"), os.path.join(clientTestDirectory, testName, fontFormat, "myfont-mod.ift.woff2"))
+
+testTag = "url-template-prefix"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Override URL template prefix",
+    description=f"The URL template prefix is overridden to a custom value. For example, setting the url template prefix to '\\x08patches/\\x80'will cause the client to look for patches(.ift_tk and .ift_gk) in the 'patches' directory in relative to the font.ift.woff2 file.",
+    shouldShowIFT=True,
+    credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+    specLink="#url-templates",
+    fontFormats=fontFormats,
+    func=madeIFTWithCustomURLTemplate,
+    funcArgs=(identifierString,)
+)
 
 def makeIFTWithId64OpcodeRenamedPatches(fontFormat, testName):
     """

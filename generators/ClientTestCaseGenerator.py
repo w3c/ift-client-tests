@@ -29,7 +29,7 @@ from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clie
                           clientTestResourcesDirectory, fallbackFontPath
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
-from testCaseGeneratorLib.helpers import decode_id32_to_int, id32_no_strip, compute_id64_file_name
+from testCaseGeneratorLib.helpers import decode_id32_to_int, id32_no_strip, compute_id64_file_name, nextMappingEntryOffset
 
 
 # IFT Table Header Offsets
@@ -551,6 +551,32 @@ writeTest(
     specLink="#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithId64OpcodeRenamedPatches,
+    funcArgs=(identifierString,)
+)
+
+def makeIFTWithRemovedEntryFromFormat2PatchMap(fontFormat, testName):
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    ift = nft.getIFTTableData()
+    entries_off = int.from_bytes(ift[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
+    entry_count = int.from_bytes(ift[21:24], "big")
+    for _ in range(entry_count):
+        ift[entries_off] |= 0b01000000  # set bit 6 (ignored)
+        entries_off = nextMappingEntryOffset(ift, entries_off)  # see helpers
+    nft.setIFTTableData(bytes(ift))
+    nft.writeTestIFTFile()
+
+testTag = "remove-entries-format-2"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Remove entries from Format 2 patch map",
+    description="The entries are removed from the Format 2 patch map.",
+    shouldShowIFT=False,
+    credits=[dict(title="Yonji Chen", role="author", link="https://github.com/ychenMonotype")],
+    specLink="#%s" % testTag,
+    fontFormats=fontFormats,
+    func=makeIFTWithRemovedEntryFromFormat2PatchMap,
     funcArgs=(identifierString,)
 )
 

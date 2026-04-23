@@ -2,7 +2,7 @@
 # URL Template Helpers
 # ------------------------------------
 
-import base64
+import base64    
 
 
 def decode_id32_to_int(id32_str):

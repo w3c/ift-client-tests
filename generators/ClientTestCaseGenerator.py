@@ -25,12 +25,22 @@ import shutil
 import struct
 import zipfile
 from fontTools.ttLib import TTFont
-from testCaseGeneratorLib.paths import resourcesDirectory, clientDirectory, clientTestDirectory,\
-                          clientTestResourcesDirectory, fallbackFontPath
+from testCaseGeneratorLib.paths import (
+    resourcesDirectory,
+    clientDirectory,
+    clientTestDirectory,
+    clientTestResourcesDirectory,
+    fallbackFontPath,
+    buildDirectory
+)
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
-from testCaseGeneratorLib.helpers import decode_id32_to_int, id32_no_strip, compute_id64_file_name, nextMappingEntryOffset
-
+from testCaseGeneratorLib.helpers import (
+    decode_id32_to_int,
+    id32_no_strip,
+    replace_format2_url_template,
+    compute_id64_file_name
+)
 
 # IFT Table Header Offsets
 IFT_ENTRIES_OFFSET_START = 25
@@ -381,7 +391,6 @@ writeTest(
 
 def makeIFTWithDuplicateGlyphKeyedTables(fontFormat, testName):
     import brotli
-
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
     nft.getIFTTableData()
 
@@ -446,7 +455,6 @@ writeTest(
 )
 
 
-
 def makeIFTWithUnstrippedId32PatchNames(fontFormat, testName):
     """
     Rename patch files to use the un-stripped (wrong) id32 encoding, then verify
@@ -495,6 +503,79 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def madeIFTwithInvalidOpCodeInURLTemplate(fontFormat, testName, url_template_bytes):
+    """Embed invalid URL template bytes per negative examples in §5.3.3 URL Templates."""
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    iftData = nft.getIFTTableData()
+    iftData = replace_format2_url_template(iftData, bytes(url_template_bytes))
+    nft.setIFTTableData(bytes(iftData))
+    nft.writeTestIFTFile()
+
+# https://www.w3.org/TR/IFT/#example-305f10ca example of negative tests
+_url_template_negative_tests = [
+    (
+        "invalid-opcode-150",
+        "URL template with invalid op code 150",
+        "Expand URL Template must return an error when the template contains op code 150 (not in the op code table).",
+        [4, *map(ord, "foo/"), 150],
+    ),
+    (
+        "opcode-zero",
+        "URL template with invalid literal op code 0",
+        "Expand URL Template must return an error when a literal op code requests 0 bytes (op code 0 is invalid).",
+        [4, *map(ord, "foo/"), 0, 128],
+    ),
+    (
+        "literal-insufficient-bytes",
+        "URL template with literal op code requesting too few bytes",
+        "Expand URL Template must return an error when a literal op code requests 10 bytes but fewer remain in the template.",
+        [10, *map(ord, "foo/"), 128],
+    ),
+    (
+        "literal-invalid-utf8",
+        "URL template with invalid UTF-8 literal",
+        "Expand URL Template must return an error when literal bytes are not valid UTF-8.",
+        [4, *map(ord, "foo/"), 0x85, 128],
+    ),
+]
+
+for suffix, title, description, template_bytes in _url_template_negative_tests:
+    identifier_string = "%s-url-templates_%s" % (testType, suffix)
+    writeTest(
+        identifier=identifier_string,
+        title=title,
+        description=description,
+        shouldShowIFT=False,
+        credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+        specLink="#url-templates",
+        fontFormats=["GLYF", "CFF"],
+        func=madeIFTwithInvalidOpCodeInURLTemplate,
+        funcArgs=(identifier_string, bytes(template_bytes)),
+    )
+
+
+def madeIFTWithCustomURLTemplate(fontFormat, testName):
+    # copy build/URL_TEMPLATE/IFT/{fontFormat} to test directory if not exists
+    if not os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat)):
+        shutil.copytree(os.path.join(buildDirectory, "URL_TEMPLATE", "IFT", fontFormat), os.path.join(clientTestDirectory, testName, fontFormat))
+    # rename the font.ift.woff2 file to myfont-mod.ift.woff2 if exists
+    if os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2")):
+        os.rename(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2"), os.path.join(clientTestDirectory, testName, fontFormat, "myfont-mod.ift.woff2"))
+
+testTag = "url-template-prefix"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Override URL template prefix",
+    description=f"The URL template prefix is overridden to a custom value. For example, setting the url template prefix to '\\x08patches/\\x80'will cause the client to look for patches(.ift_tk and .ift_gk) in the 'patches' directory in relative to the font.ift.woff2 file.",
+    shouldShowIFT=True,
+    credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+    specLink="#url-templates",
+    fontFormats=fontFormats,
+    func=madeIFTWithCustomURLTemplate,
+    funcArgs=(identifierString,)
+)
 
 def makeIFTWithId64OpcodeRenamedPatches(fontFormat, testName):
     """
@@ -558,10 +639,11 @@ def makeIFTWithRemovedEntryFromFormat2PatchMap(fontFormat, testName):
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
     ift = nft.getIFTTableData()
     entries_off = int.from_bytes(ift[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
-    entry_count = int.from_bytes(ift[21:24], "big")
-    for _ in range(entry_count):
-        ift[entries_off] |= 0b01000000  # set bit 6 (ignored)
-        entries_off = nextMappingEntryOffset(ift, entries_off)  # see helpers
+    ift[entries_off] |= 0b01000000  # set bit 6 (ignored) on entry 0
+    # entry_count = int.from_bytes(ift[21:24], "big")
+    # for _ in range(entry_count):
+    #     ift[entries_off] |= 0b01000000  # set bit 6 (ignored)
+        # entries_off = nextMappingEntryOffset(ift, entries_off)  # see helpers
     nft.setIFTTableData(bytes(ift))
     nft.writeTestIFTFile()
 
@@ -577,6 +659,159 @@ writeTest(
     specLink="#%s" % testTag,
     fontFormats=fontFormats,
     func=makeIFTWithRemovedEntryFromFormat2PatchMap,
+    funcArgs=(identifierString,)
+)
+
+def makeIFTWithUnsortedGlyphDataOffsets(fontFormat, testName):
+    """
+    Reverse the glyphDataOffsets array inside each glyph-keyed patch file so
+    that the offsets are no longer in ascending order.
+
+    Tests conform-glyph-keyed-glyph-data-offsets-sort-ascending:
+    'Offsets must be sorted in ascending order.'
+
+    GlyphPatches layout (after brotli decompression):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24, per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[glyphCount * tableCount + 1] (Offset32 each)
+      then:  glyphData[variable]
+    """
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # Outer header: format(4) reserved(4) flags(1) compatibilityId(16)
+        #               maxUncompressedLength(4) brotliStream(...)
+        flags = data[8]
+        brotli_data = bytes(data[29:])
+        decompressed = bytearray(brotli.decompress(brotli_data))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+        gid_size = 3 if (flags & 1) else 2
+
+        # Navigate to glyphDataOffsets
+        tables_offset = 5 + glyph_count * gid_size
+        glyph_data_offsets_offset = tables_offset + table_count * 4
+        num_offsets = glyph_count * table_count + 1
+
+        if num_offsets >= 2:
+            # Read all offsets
+            offsets = [
+                struct.unpack(">I", decompressed[glyph_data_offsets_offset + i * 4:
+                                                 glyph_data_offsets_offset + i * 4 + 4])[0]
+                for i in range(num_offsets)
+            ]
+            # Reverse so they are no longer ascending
+            offsets.reverse()
+            for i, off in enumerate(offsets):
+                struct.pack_into(">I", decompressed,
+                                 glyph_data_offsets_offset + i * 4, off)
+
+        recompressed = brotli.compress(bytes(decompressed))
+        struct.pack_into(">I", data, 25, len(decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-glyph-data-offsets-sort-ascending"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with unsorted glyphDataOffsets",
+    description="The glyphDataOffsets array in the glyph keyed patch is reversed so the "
+                "offsets are no longer in ascending order. The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsortedGlyphDataOffsets,
+    funcArgs=(identifierString,)
+)
+
+def makeIFTWithUnsortedGlyphIds(fontFormat, testName):
+    """
+    Reverse the glyphIds array inside each glyph-keyed patch file so that
+    the glyph IDs are no longer in ascending sorted order.
+
+    Tests conform-glyph-keyed-glyph-ids-sort-ascending-unique:
+    'Must be in ascending sorted order and must not contain any duplicate values.'
+
+    GlyphPatches layout (after brotli decompression):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24, per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[...]
+      then:  glyphData[...]
+    """
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # Outer header: format(4) reserved(4) flags(1) compatibilityId(16)
+        #               maxUncompressedLength(4) brotliStream(...)
+        flags = data[8]
+        brotli_data = bytes(data[29:])
+        decompressed = bytearray(brotli.decompress(brotli_data))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        gid_size = 3 if (flags & 1) else 2
+
+        assert glyph_count >= 2, (
+            f"{gkFile}: glyph_count={glyph_count}, need at least 2 to reverse glyphIds. "
+            "The source glyph-keyed patch must contain multiple glyphs for this test."
+        )
+
+        # Read all glyph IDs
+        gids = [
+            int.from_bytes(decompressed[5 + i * gid_size:5 + i * gid_size + gid_size], 'big')
+            for i in range(glyph_count)
+        ]
+        # Reverse so they are no longer in ascending order
+        gids.reverse()
+        for i, gid in enumerate(gids):
+            decompressed[5 + i * gid_size:5 + i * gid_size + gid_size] = gid.to_bytes(gid_size, 'big')
+
+        recompressed = brotli.compress(bytes(decompressed))
+        struct.pack_into(">I", data, 25, len(decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-glyph-ids-sort-ascending-unique"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with unsorted glyph IDs",
+    description="The glyphIds array in the glyph keyed patch is reversed so the "
+                "glyph IDs are no longer in ascending sorted order. The client must "
+                "reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsortedGlyphIds,
     funcArgs=(identifierString,)
 )
 

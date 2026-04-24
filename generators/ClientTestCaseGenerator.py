@@ -336,6 +336,44 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+def makeIFTWithInvalidGlyphKeyedPatchFormat(fontFormat, testName):
+    """Modify all glyph keyed patch files to have an invalid format tag.
+
+    Per the spec (§6.3 Glyph Keyed), the format field of a glyph keyed patch
+    must be set to 'ifgk'. This test sets it to 'XXXX' so the client should
+    reject the patch.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    # Modify all _gk patch files in the test directory to have an invalid format tag
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+        # The first 4 bytes are the format Tag, which must be 'ifgk'.
+        # Replace with an invalid value.
+        data[0:4] = b'XXXX'
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-format-equals-ifgk"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with invalid format tag",
+    description="The glyph keyed patch format field is set to an invalid value (not 'ifgk'). The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithInvalidGlyphKeyedPatchFormat,
+    funcArgs=(identifierString,)
+)
+
 def makeIFTWithUnsortedTableKeyedPatchOffsets(fontFormat, testName):
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
     nft.getIFTTableData()

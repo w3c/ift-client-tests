@@ -943,6 +943,111 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def makeIFTWithUnsupportedTableInGlyphPatch(fontFormat, testName):
+    """
+    Add an unsupported table entry ('hmtx') with zero-length glyph data alongside
+    the existing supported table entry in each glyph-keyed patch file.
+
+    Tests conform-table-entries-ignore-others:
+    'Entries for tables of any other types must be ignored.'
+
+    A conforming client ignores the 'hmtx' entry and still applies the supported
+    table (glyf or CFF), allowing the IFT font to load and render correctly.
+    shouldShowIFT=True: the font renders correctly when the client correctly
+    ignores the unsupported table entry.
+
+    GlyphPatches layout (decompressed):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24 per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[glyphCount * tableCount + 1] (Offset32 each)
+      then:  glyphData[variable]
+
+    We append 'hmtx' as an additional table tag and add glyphCount new offsets
+    (all equal to the sentinel value) so the new table has zero-length glyph data
+    for every glyph.
+    """
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        flags = data[8]
+        gid_size = 3 if (flags & 1) else 2
+        decompressed = bytearray(brotli.decompress(bytes(data[29:])))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+
+        tables_offset = 5 + glyph_count * gid_size
+        glyph_data_offsets_offset = tables_offset + table_count * 4
+        num_offsets = glyph_count * table_count + 1
+        glyph_data_start = glyph_data_offsets_offset + num_offsets * 4
+
+        # Sentinel = total glyph data size; used as the offset for zero-length entries
+        sentinel = struct.unpack(">I", decompressed[
+            glyph_data_offsets_offset + (num_offsets - 1) * 4:
+            glyph_data_offsets_offset + num_offsets * 4
+        ])[0]
+
+        new_decompressed = bytearray()
+        # glyphCount (unchanged)
+        new_decompressed.extend(struct.pack(">I", glyph_count))
+        # tableCount + 1
+        new_decompressed.append(table_count + 1)
+        # glyphIds (unchanged)
+        new_decompressed.extend(decompressed[5:tables_offset])
+        # existing table tags (unchanged)
+        new_decompressed.extend(decompressed[tables_offset:glyph_data_offsets_offset])
+        # new unsupported table tag
+        new_decompressed.extend(b'hmtx')
+        # existing offsets minus the sentinel
+        new_decompressed.extend(
+            decompressed[glyph_data_offsets_offset:
+                         glyph_data_offsets_offset + (num_offsets - 1) * 4]
+        )
+        # glyph_count new offsets for 'hmtx', all equal to sentinel (zero-length data)
+        for _ in range(glyph_count):
+            new_decompressed.extend(struct.pack(">I", sentinel))
+        # sentinel (unchanged value)
+        new_decompressed.extend(struct.pack(">I", sentinel))
+        # glyph data (unchanged)
+        new_decompressed.extend(decompressed[glyph_data_start:])
+
+        recompressed = brotli.compress(bytes(new_decompressed))
+        struct.pack_into(">I", data, 25, len(new_decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-table-entries-ignore-others"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with unsupported table entry must be ignored",
+    description="Each glyph-keyed patch contains an entry for the unsupported table 'hmtx' "
+                "alongside the supported table entry. A conforming client ignores the 'hmtx' "
+                "entry and still applies the supported table, allowing the IFT font to render "
+                "correctly.",
+    shouldShowIFT=True,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsupportedTableInGlyphPatch,
+    funcArgs=(identifierString,)
+)
+
 # ------------------
 # Generate the Index
 # ------------------

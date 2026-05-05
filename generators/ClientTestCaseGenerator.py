@@ -990,11 +990,21 @@ def makeIFTWithUnsupportedTableInGlyphPatch(fontFormat, testName):
         num_offsets = glyph_count * table_count + 1
         glyph_data_start = glyph_data_offsets_offset + num_offsets * 4
 
-        # Sentinel = total glyph data size; used as the offset for zero-length entries
-        sentinel = struct.unpack(">I", decompressed[
-            glyph_data_offsets_offset + (num_offsets - 1) * 4:
-            glyph_data_offsets_offset + num_offsets * 4
-        ])[0]
+        # Offsets are absolute from the start of the decompressed buffer.
+        # Adding 1 table tag (4 bytes) and glyph_count new offset entries
+        # (glyph_count * 4 bytes) shifts glyphData forward by this delta.
+        # All existing offsets must be adjusted accordingly.
+        offset_delta = 4 + glyph_count * 4
+
+        # Read and adjust all existing offsets (including the sentinel)
+        existing_offsets = [
+            struct.unpack(">I", decompressed[
+                glyph_data_offsets_offset + i * 4:
+                glyph_data_offsets_offset + i * 4 + 4
+            ])[0] + offset_delta
+            for i in range(num_offsets)
+        ]
+        new_sentinel = existing_offsets[-1]
 
         new_decompressed = bytearray()
         # glyphCount (unchanged)
@@ -1007,16 +1017,14 @@ def makeIFTWithUnsupportedTableInGlyphPatch(fontFormat, testName):
         new_decompressed.extend(decompressed[tables_offset:glyph_data_offsets_offset])
         # new unsupported table tag
         new_decompressed.extend(b'hmtx')
-        # existing offsets minus the sentinel
-        new_decompressed.extend(
-            decompressed[glyph_data_offsets_offset:
-                         glyph_data_offsets_offset + (num_offsets - 1) * 4]
-        )
-        # glyph_count new offsets for 'hmtx', all equal to sentinel (zero-length data)
+        # adjusted existing offsets minus the sentinel
+        for off in existing_offsets[:-1]:
+            new_decompressed.extend(struct.pack(">I", off))
+        # glyph_count new offsets for 'hmtx', all equal to new_sentinel (zero-length data)
         for _ in range(glyph_count):
-            new_decompressed.extend(struct.pack(">I", sentinel))
-        # sentinel (unchanged value)
-        new_decompressed.extend(struct.pack(">I", sentinel))
+            new_decompressed.extend(struct.pack(">I", new_sentinel))
+        # new sentinel
+        new_decompressed.extend(struct.pack(">I", new_sentinel))
         # glyph data (unchanged)
         new_decompressed.extend(decompressed[glyph_data_start:])
 

@@ -39,7 +39,8 @@ from testCaseGeneratorLib.helpers import (
     decode_id32_to_int,
     id32_no_strip,
     replace_format2_url_template,
-    compute_id64_file_name
+    compute_id64_file_name,
+    compute_id64_no_strip,
 )
 
 # IFT Table Header Offsets
@@ -1053,6 +1054,60 @@ writeTest(
     specLink="#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithUnsupportedTableInGlyphPatch,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithUnstrippedId64PatchNames(fontFormat, testName):
+    """
+    Switch the URL template opcode to id64 (0x85) and rename patch files to
+    use the un-stripped 4-byte base64url encoding.
+
+    Tests conform-entry-id-converted (id64 variant):
+    'When entry ID is an unsigned integer it must first be converted to a big
+    endian 32 bit unsigned integer, but then all leading bytes that are equal
+    to 0 are removed before encoding.'
+
+    Patches are renamed from the correctly-stripped id64 names (e.g. 'AQ==.ift_tk'
+    for entry 1) to the incorrectly un-stripped 4-byte base64url names (e.g.
+    'AAAAAQ==.ift_tk' for entry 1). A conforming client strips leading zero bytes
+    and looks for 'AQ==.ift_tk' (URL-encoded as 'AQ%3D%3D.ift_tk'), which does
+    not exist, so the IFT font cannot be loaded.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+    raw[IFT_URL_TEMPLATE_OFFSET] = 0x85  # id64 opcode
+    nft.setIFTTableData(bytes(raw))
+
+    dest_dir = os.path.join(nft.testDirectory, fontFormat)
+    for old_path in glob.glob(os.path.join(dest_dir, "*_tk")):
+        old_basename = os.path.basename(old_path)
+        id32_part = old_basename.replace(".ift_tk", "")
+        if not all(c in "0123456789ABCDEFGHIJKLMNOPQRSTUV" for c in id32_part.upper()):
+            continue
+        entry_id = decode_id32_to_int(id32_part)
+        wrong_name = compute_id64_no_strip(entry_id) + ".ift_tk"
+        shutil.move(old_path, os.path.join(dest_dir, wrong_name))
+
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-entry-id-converted"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="URL template id64 must strip leading zero bytes from integer entry IDs",
+    description="The URL template uses the id64 opcode (0x85). Patch files are stored "
+                "at the un-stripped 4-byte base64url names (e.g. 'AAAAAQ==.ift_tk' for "
+                "entry 1). A conforming client strips leading zero bytes and looks for "
+                "'AQ==.ift_tk' (URL-encoded as 'AQ%3D%3D.ift_tk'), which does not exist, "
+                "so the IFT font cannot be loaded.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnstrippedId64PatchNames,
     funcArgs=(identifierString,)
 )
 

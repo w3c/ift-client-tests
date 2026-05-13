@@ -1111,6 +1111,88 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def makeIFTWithFormat1MismatchedGlyphCount(fontFormat, testName):
+    """
+    Replace the Format 2 IFT table with a hand-built Format 1 patch map whose
+    glyphCount field does not match the number of glyphs in the font (maxp.numGlyphs).
+
+    Tests conform-format1-glyph-count-matches: 'Number of glyphs that mappings are
+    provided for. Must match the number of glyphs in the the font file.'
+
+    The constructed Format 1 table is otherwise well-formed: maxEntryIndex and
+    maxGlyphMapEntryIndex are both 0, the Glyph Map has firstMappedGlyph equal to
+    glyphCount so the entryIndex array is empty (all font glyphs are implicitly
+    mapped to entry 0), and a valid URL template and patchFormat are provided.
+    The only defect is the glyphCount value, so a conforming client must detect
+    the mismatch in step 1 of Interpret Format 1 Patch Map and reject the font.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+
+    # Preserve the original compatibilityId so the only defect is glyphCount.
+    # Format 2 layout: compatibilityId is bytes 5..21.
+    compatibility_id = bytes(raw[5:21])
+
+    num_glyphs = nft.font["maxp"].numGlyphs
+    bad_glyph_count = num_glyphs + 90  # any value != num_glyphs
+
+    # Format 1 Patch Map fixed header (see spec §patch-map-format-1)
+    header = bytearray()
+    header.append(1)                                  # format = 1
+    header.extend(b"\x00\x00\x00")                    # reserved (uint24)
+    header.append(0)                                  # flags
+    header.extend(compatibility_id)                   # compatibilityId[16]
+    header.extend(struct.pack(">H", 0))               # maxEntryIndex
+    header.extend(struct.pack(">H", 0))               # maxGlyphMapEntryIndex
+    header.extend(bad_glyph_count.to_bytes(3, "big")) # glyphCount (uint24) — INVALID
+
+    # Offsets are placeholders; filled in after the variable-length fields are sized.
+    glyph_map_offset_pos = len(header)
+    header.extend(struct.pack(">I", 0))               # glyphMapOffset (uint32)
+    header.extend(struct.pack(">I", 0))               # featureMapOffset = 0 (null)
+
+    # appliedEntriesBitMap[(maxEntryIndex + 8) / 8] = appliedEntriesBitMap[1]
+    header.append(0)
+
+    # URL template: id32 insertion opcode (0x80), then literal ".ift_tk" (length 7).
+    # Matches the patch file naming used elsewhere in this test suite (e.g. "04.ift_tk").
+    url_template = bytes([0x80, 7]) + b".ift_tk"
+    header.extend(struct.pack(">H", len(url_template)))  # urlTemplateLength
+    header.extend(url_template)                          # urlTemplate
+
+    header.append(1)                                  # patchFormat = 1 (table keyed, full invalidation)
+
+    # Glyph Map sub-table. firstMappedGlyph = bad_glyph_count makes
+    # entryIndex[glyphCount - firstMappedGlyph] zero-length.
+    glyph_map = struct.pack(">H", bad_glyph_count)
+
+    # Fill in glyphMapOffset
+    struct.pack_into(">I", header, glyph_map_offset_pos, len(header))
+
+    new_ift = bytes(header) + glyph_map
+    nft.setIFTTableData(new_ift)
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-format1-glyph-count-matches"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Format 1 patch map with glyphCount that does not match the font",
+    description="The IFT table uses Format 1 with a glyphCount field set to a value "
+                "that does not match the number of glyphs in the font (maxp.numGlyphs). "
+                "A conforming client must detect the mismatch during Interpret Format 1 "
+                "Patch Map and reject the font.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithFormat1MismatchedGlyphCount,
+    funcArgs=(identifierString,)
+)
+
 # ------------------
 # Generate the Index
 # ------------------

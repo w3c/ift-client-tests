@@ -1193,6 +1193,78 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def makeIFTWithFormat1InvalidPatchFormat(fontFormat, testName):
+    """
+    Replace the Format 2 IFT table with a hand-built Format 1 patch map whose
+    patchFormat field is set to 0, which is not one of the values from §6.1
+    Formats Summary (valid values are 1, 2, 3).
+
+    Tests conform-format1-valid-format-number: 'Must be set to one of the format
+    numbers from the §6.1 Formats Summary table.'
+
+    The constructed Format 1 table is otherwise well-formed (correct glyphCount,
+    null featureMap, empty entryIndex array since all font glyphs map to entry 0
+    implicitly); the only defect is the invalid patchFormat value, so a conforming
+    client must reject the font.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+
+    compatibility_id = bytes(raw[5:21])
+
+    num_glyphs = nft.font["maxp"].numGlyphs
+
+    header = bytearray()
+    header.append(1)                                  # format = 1
+    header.extend(b"\x00\x00\x00")                    # reserved (uint24)
+    header.append(0)                                  # flags
+    header.extend(compatibility_id)                   # compatibilityId[16]
+    header.extend(struct.pack(">H", 0))               # maxEntryIndex
+    header.extend(struct.pack(">H", 0))               # maxGlyphMapEntryIndex
+    header.extend(num_glyphs.to_bytes(3, "big"))      # glyphCount (uint24)
+
+    glyph_map_offset_pos = len(header)
+    header.extend(struct.pack(">I", 0))               # glyphMapOffset (uint32)
+    header.extend(struct.pack(">I", 0))               # featureMapOffset = 0 (null)
+
+    header.append(0)                                  # appliedEntriesBitMap[1]
+
+    url_template = bytes([0x80, 7]) + b".ift_tk"
+    header.extend(struct.pack(">H", len(url_template)))
+    header.extend(url_template)
+
+    header.append(0)                                  # patchFormat = 0 — INVALID
+
+    # firstMappedGlyph = glyphCount makes entryIndex[] zero-length, so every
+    # glyph is implicitly mapped to entry 0.
+    glyph_map = struct.pack(">H", num_glyphs)
+
+    struct.pack_into(">I", header, glyph_map_offset_pos, len(header))
+
+    new_ift = bytes(header) + glyph_map
+    nft.setIFTTableData(new_ift)
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-format1-valid-format-number"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Format 1 patch map with invalid patchFormat value",
+    description="The IFT table uses Format 1 with a patchFormat field set to 0, "
+                "which is not one of the format numbers listed in the §6.1 Formats "
+                "Summary table (valid values are 1, 2, and 3). A conforming client "
+                "must reject the font.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithFormat1InvalidPatchFormat,
+    funcArgs=(identifierString,)
+)
+
 # ------------------
 # Generate the Index
 # ------------------

@@ -20,6 +20,14 @@ git submodule update
 
 To initialize the repository.
 
+## Setup python virtual venv and install the python dependencies in  generator/requirements.txt
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r generator/requirements.txt
+```
+
 ## Test Coverage Reports
 
 ```bash

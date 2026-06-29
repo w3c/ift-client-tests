@@ -1,3 +1,4 @@
 test-coverage-report.txt
 IFTClient/
 build/
+.venv/

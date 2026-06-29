@@ -1,4 +1,5 @@
 import struct
+import base64
 
 from testCaseGeneratorLib.constants import (
     IFT_ENTRIES_OFFSET_END,
@@ -66,8 +67,6 @@ def replace_format2_url_template(iftData, new_template):
         )
 
     return new_patch_map
-
-import base64    
 
 
 def decode_id32_to_int(id32_str):

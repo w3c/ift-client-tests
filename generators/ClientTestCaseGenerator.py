@@ -675,15 +675,18 @@ writeTest(
 )
 
 def makeIFTWithRemovedEntryFromFormat2PatchMap(fontFormat, testName):
+    """
+    Mark every Format 2 mapping entry as 'ignored' (formatFlags bit 6).
+    """
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
-    ift = nft.getIFTTableData()
-    entries_off = int.from_bytes(ift[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
-    ift[entries_off] |= 0b01000000  # set bit 6 (ignored) on entry 0
-    # entry_count = int.from_bytes(ift[21:24], "big")
-    # for _ in range(entry_count):
-    #     ift[entries_off] |= 0b01000000  # set bit 6 (ignored)
-        # entries_off = nextMappingEntryOffset(ift, entries_off)  # see helpers
-    nft.setIFTTableData(bytes(ift))
+    for tag in ("IFT ", "IFTX"):
+        if tag not in nft.font:
+            continue
+        patchMap = nft.font[tag].table
+        for entry in patchMap.MappingEntries.entries:
+            flags = entry["formatFlags"]
+            #bitwise OR operation to set the ignored flag (formatFlags bit 6)
+            entry["formatFlags"] = type(flags)(int(flags) | 0x40)
     nft.writeTestIFTFile()
 
 testTag = "remove-entries-format-2"

@@ -39,7 +39,8 @@ from testCaseGeneratorLib.helpers import (
     decode_id32_to_int,
     id32_no_strip,
     replace_format2_url_template,
-    compute_id64_file_name
+    compute_id64_file_name,
+    compute_id64_no_strip,
 )
 
 # IFT Table Header Offsets
@@ -333,6 +334,44 @@ writeTest(
     specLink= "#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithInvalidTableKeyedPatchFormat,
+    funcArgs=(identifierString,)
+)
+
+def makeIFTWithInvalidGlyphKeyedPatchFormat(fontFormat, testName):
+    """Modify all glyph keyed patch files to have an invalid format tag.
+
+    Per the spec (§6.3 Glyph Keyed), the format field of a glyph keyed patch
+    must be set to 'ifgk'. This test sets it to 'XXXX' so the client should
+    reject the patch.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    # Modify all _gk patch files in the test directory to have an invalid format tag
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+        # The first 4 bytes are the format Tag, which must be 'ifgk'.
+        # Replace with an invalid value.
+        data[0:4] = b'XXXX'
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+testTag = "conform-glyph-keyed-format-equals-ifgk"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with invalid format tag",
+    description="The glyph keyed patch format field is set to an invalid value (not 'ifgk'). The client must reject the patch.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithInvalidGlyphKeyedPatchFormat,
     funcArgs=(identifierString,)
 )
 
@@ -812,6 +851,443 @@ writeTest(
     specLink="#%s" % identifierString,
     fontFormats=fontFormats,
     func=makeIFTWithUnsortedGlyphIds,
+    funcArgs=(identifierString,)
+)
+
+
+def _find_and_corrupt_sparse_bit_set(iftData):
+    """
+    Navigate Format 2 IFT table entries to find the first codePoints sparse bit set,
+    then corrupt its header byte so that H exceeds the maximum height for the
+    given branch factor.
+
+    Per §sparse-bit-set-decoding step 2: 'If H is greater than the Maximum Height
+    in the Branch Factor Encoding table in the row for B then the encoding is invalid,
+    return an error.'
+
+    Branch Factor Encoding (spec §sparse-bit-set-decoding):
+      bits 0-1 = 0b00 → B=2,  maxH=31
+      bits 0-1 = 0b01 → B=4,  maxH=16
+      bits 0-1 = 0b10 → B=8,  maxH=11
+      bits 0-1 = 0b11 → B=32, maxH=7
+    """
+    iftData = bytearray(iftData)
+    entry_id_string_data_offset = int.from_bytes(iftData[29:33], 'big')
+    entries_offset = int.from_bytes(iftData[25:29], 'big')
+    entry_count = int.from_bytes(iftData[22:25], 'big')
+
+    offset = entries_offset
+    for _ in range(entry_count):
+        format_flags = iftData[offset]
+        offset += 1
+
+        # bit 0: featureCount + featureTags + designSpaceCount + designSpaceSegments
+        if format_flags & 0x01:
+            feature_count = iftData[offset]
+            offset += 1 + feature_count * 4  # featureCount byte + featureTags (4 bytes each)
+            design_space_count = int.from_bytes(iftData[offset:offset + 2], 'big')
+            offset += 2 + design_space_count * 12  # designSpaceCount uint16 + segments (12 bytes each)
+
+        # bit 1: childEntryMatchModeAndCount + childEntryIndices
+        if format_flags & 0x02:
+            child_entry_match_mode_and_count = iftData[offset]
+            offset += 1
+            child_entry_count = child_entry_match_mode_and_count & 0x7F
+            offset += child_entry_count * 3  # uint24 each
+
+        # bit 2: entryIdDelta (variable int24, LSB continuation) or entryIdStringLength
+        if format_flags & 0x04:
+            if entry_id_string_data_offset == 0:
+                # entryIdDelta: LSB set means another delta follows
+                while True:
+                    delta = int.from_bytes(iftData[offset:offset + 3], 'big')
+                    offset += 3
+                    if not (delta & 0x01):
+                        break
+            else:
+                # entryIdStringLength: MSB set means another length follows
+                while True:
+                    length_val = int.from_bytes(iftData[offset:offset + 3], 'big')
+                    offset += 3
+                    if not (length_val & 0x800000):
+                        break
+
+        # bit 3: patchFormat (1 byte)
+        if format_flags & 0x08:
+            offset += 1
+
+        # bits 4 and/or 5: bias (if bit 5 set) then codePoints sparse bit set
+        if format_flags & 0x30:
+            if format_flags & 0x20:  # bit 5: bias present
+                if format_flags & 0x10:  # bits 4+5: uint24 bias
+                    offset += 3
+                else:                    # bit 5 only: uint16 bias
+                    offset += 2
+
+            # Corrupt the sparse bit set header byte
+            header_byte = iftData[offset]
+            branch_factor_bits = header_byte & 0x03
+            max_heights = {0: 31, 1: 16, 2: 11, 3: 7}
+            max_h = max_heights[branch_factor_bits]
+            # Set H = max_h + 1 (invalid). H occupies bits 2-6 (5 bits).
+            invalid_h = (max_h + 1) & 0x1F
+            iftData[offset] = (header_byte & 0x03) | (invalid_h << 2)
+            return bytes(iftData)
+
+    raise ValueError("No codePoints (sparse bit set) field found in any mapping entry")
+
+
+def makeIFTWithInvalidSparseBitSet(fontFormat, testName):
+    """
+    Corrupt the first codePoints sparse bit set in the IFT table so that its
+    height H exceeds the maximum allowed for the encoded branch factor.
+
+    Tests conform-sparse-bit-set-decoding: if the decoding algorithm returns
+    an error the client must treat the patch map as invalid and not apply any
+    patches, causing the IFT font to fail to render.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+    corrupted = _find_and_corrupt_sparse_bit_set(bytes(raw))
+    nft.setIFTTableData(corrupted)
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-sparse-bit-set-decoding"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Sparse bit set with height exceeding maximum for branch factor",
+    description="The codePoints sparse bit set in a mapping entry has a height H that "
+                "exceeds the maximum allowed for its branch factor. The client must treat "
+                "the patch map as invalid and not render using the IFT font.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithInvalidSparseBitSet,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithUnsupportedTableInGlyphPatch(fontFormat, testName):
+    """
+    Add an unsupported table entry ('hmtx') with zero-length glyph data alongside
+    the existing supported table entry in each glyph-keyed patch file.
+
+    Tests conform-table-entries-ignore-others:
+    'Entries for tables of any other types must be ignored.'
+
+    A conforming client ignores the 'hmtx' entry and still applies the supported
+    table (glyf or CFF), allowing the IFT font to load and render correctly.
+    shouldShowIFT=True: the font renders correctly when the client correctly
+    ignores the unsupported table entry.
+
+    GlyphPatches layout (decompressed):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24 per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[glyphCount * tableCount + 1] (Offset32 each)
+      then:  glyphData[variable]
+
+    We append 'hmtx' as an additional table tag and add glyphCount new offsets
+    (all equal to the sentinel value) so the new table has zero-length glyph data
+    for every glyph.
+    """
+    import brotli
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        flags = data[8]
+        gid_size = 3 if (flags & 1) else 2
+        decompressed = bytearray(brotli.decompress(bytes(data[29:])))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+
+        tables_offset = 5 + glyph_count * gid_size
+        glyph_data_offsets_offset = tables_offset + table_count * 4
+        num_offsets = glyph_count * table_count + 1
+        glyph_data_start = glyph_data_offsets_offset + num_offsets * 4
+
+        # Offsets are absolute from the start of the decompressed buffer.
+        # Adding 1 table tag (4 bytes) and glyph_count new offset entries
+        # (glyph_count * 4 bytes) shifts glyphData forward by this delta.
+        # All existing offsets must be adjusted accordingly.
+        offset_delta = 4 + glyph_count * 4
+
+        # Read and adjust all existing offsets (including the sentinel)
+        existing_offsets = [
+            struct.unpack(">I", decompressed[
+                glyph_data_offsets_offset + i * 4:
+                glyph_data_offsets_offset + i * 4 + 4
+            ])[0] + offset_delta
+            for i in range(num_offsets)
+        ]
+        new_sentinel = existing_offsets[-1]
+
+        new_decompressed = bytearray()
+        # glyphCount (unchanged)
+        new_decompressed.extend(struct.pack(">I", glyph_count))
+        # tableCount + 1
+        new_decompressed.append(table_count + 1)
+        # glyphIds (unchanged)
+        new_decompressed.extend(decompressed[5:tables_offset])
+        # existing table tags (unchanged)
+        new_decompressed.extend(decompressed[tables_offset:glyph_data_offsets_offset])
+        # new unsupported table tag
+        new_decompressed.extend(b'hmtx')
+        # adjusted existing offsets minus the sentinel
+        for off in existing_offsets[:-1]:
+            new_decompressed.extend(struct.pack(">I", off))
+        # glyph_count new offsets for 'hmtx', all equal to new_sentinel (zero-length data)
+        for _ in range(glyph_count):
+            new_decompressed.extend(struct.pack(">I", new_sentinel))
+        # new sentinel
+        new_decompressed.extend(struct.pack(">I", new_sentinel))
+        # glyph data (unchanged)
+        new_decompressed.extend(decompressed[glyph_data_start:])
+
+        recompressed = brotli.compress(bytes(new_decompressed))
+        struct.pack_into(">I", data, 25, len(new_decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-table-entries-ignore-others"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with unsupported table entry must be ignored",
+    description="Each glyph-keyed patch contains an entry for the unsupported table 'hmtx' "
+                "alongside the supported table entry. A conforming client ignores the 'hmtx' "
+                "entry and still applies the supported table, allowing the IFT font to render "
+                "correctly.",
+    shouldShowIFT=True,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnsupportedTableInGlyphPatch,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithUnstrippedId64PatchNames(fontFormat, testName):
+    """
+    Switch the URL template opcode to id64 (0x85) and rename patch files to
+    use the un-stripped 4-byte base64url encoding.
+
+    Tests conform-entry-id-converted (id64 variant):
+    'When entry ID is an unsigned integer it must first be converted to a big
+    endian 32 bit unsigned integer, but then all leading bytes that are equal
+    to 0 are removed before encoding.'
+
+    Patches are renamed from the correctly-stripped id64 names (e.g. 'AQ==.ift_tk'
+    for entry 1) to the incorrectly un-stripped 4-byte base64url names (e.g.
+    'AAAAAQ==.ift_tk' for entry 1). A conforming client strips leading zero bytes
+    and looks for 'AQ==.ift_tk' (URL-encoded as 'AQ%3D%3D.ift_tk'), which does
+    not exist, so the IFT font cannot be loaded.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+    raw[IFT_URL_TEMPLATE_OFFSET] = 0x85  # id64 opcode
+    nft.setIFTTableData(bytes(raw))
+
+    dest_dir = os.path.join(nft.testDirectory, fontFormat)
+    for old_path in glob.glob(os.path.join(dest_dir, "*_tk")):
+        old_basename = os.path.basename(old_path)
+        id32_part = old_basename.replace(".ift_tk", "")
+        if not all(c in "0123456789ABCDEFGHIJKLMNOPQRSTUV" for c in id32_part.upper()):
+            continue
+        entry_id = decode_id32_to_int(id32_part)
+        wrong_name = compute_id64_no_strip(entry_id) + ".ift_tk"
+        shutil.move(old_path, os.path.join(dest_dir, wrong_name))
+
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-entry-id-converted"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="URL template id64 must strip leading zero bytes from integer entry IDs",
+    description="The URL template uses the id64 opcode (0x85). Patch files are stored "
+                "at the un-stripped 4-byte base64url names (e.g. 'AAAAAQ==.ift_tk' for "
+                "entry 1). A conforming client strips leading zero bytes and looks for "
+                "'AQ==.ift_tk' (URL-encoded as 'AQ%3D%3D.ift_tk'), which does not exist, "
+                "so the IFT font cannot be loaded.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnstrippedId64PatchNames,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithFormat1MismatchedGlyphCount(fontFormat, testName):
+    """
+    Replace the Format 2 IFT table with a hand-built Format 1 patch map whose
+    glyphCount field does not match the number of glyphs in the font (maxp.numGlyphs).
+
+    Tests conform-format1-glyph-count-matches: 'Number of glyphs that mappings are
+    provided for. Must match the number of glyphs in the the font file.'
+
+    The constructed Format 1 table is otherwise well-formed: maxEntryIndex and
+    maxGlyphMapEntryIndex are both 0, the Glyph Map has firstMappedGlyph equal to
+    glyphCount so the entryIndex array is empty (all font glyphs are implicitly
+    mapped to entry 0), and a valid URL template and patchFormat are provided.
+    The only defect is the glyphCount value, so a conforming client must detect
+    the mismatch in step 1 of Interpret Format 1 Patch Map and reject the font.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+
+    # Preserve the original compatibilityId so the only defect is glyphCount.
+    # Format 2 layout: compatibilityId is bytes 5..21.
+    compatibility_id = bytes(raw[5:21])
+
+    num_glyphs = nft.font["maxp"].numGlyphs
+    bad_glyph_count = num_glyphs + 90  # any value != num_glyphs
+
+    # Format 1 Patch Map fixed header (see spec §patch-map-format-1)
+    header = bytearray()
+    header.append(1)                                  # format = 1
+    header.extend(b"\x00\x00\x00")                    # reserved (uint24)
+    header.append(0)                                  # flags
+    header.extend(compatibility_id)                   # compatibilityId[16]
+    header.extend(struct.pack(">H", 0))               # maxEntryIndex
+    header.extend(struct.pack(">H", 0))               # maxGlyphMapEntryIndex
+    header.extend(bad_glyph_count.to_bytes(3, "big")) # glyphCount (uint24) — INVALID
+
+    # Offsets are placeholders; filled in after the variable-length fields are sized.
+    glyph_map_offset_pos = len(header)
+    header.extend(struct.pack(">I", 0))               # glyphMapOffset (uint32)
+    header.extend(struct.pack(">I", 0))               # featureMapOffset = 0 (null)
+
+    # appliedEntriesBitMap[(maxEntryIndex + 8) / 8] = appliedEntriesBitMap[1]
+    header.append(0)
+
+    # URL template: id32 insertion opcode (0x80), then literal ".ift_tk" (length 7).
+    # Matches the patch file naming used elsewhere in this test suite (e.g. "04.ift_tk").
+    url_template = bytes([0x80, 7]) + b".ift_tk"
+    header.extend(struct.pack(">H", len(url_template)))  # urlTemplateLength
+    header.extend(url_template)                          # urlTemplate
+
+    header.append(1)                                  # patchFormat = 1 (table keyed, full invalidation)
+
+    # Glyph Map sub-table. firstMappedGlyph = bad_glyph_count makes
+    # entryIndex[glyphCount - firstMappedGlyph] zero-length.
+    glyph_map = struct.pack(">H", bad_glyph_count)
+
+    # Fill in glyphMapOffset
+    struct.pack_into(">I", header, glyph_map_offset_pos, len(header))
+
+    new_ift = bytes(header) + glyph_map
+    nft.setIFTTableData(new_ift)
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-format1-glyph-count-matches"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Format 1 patch map with glyphCount that does not match the font",
+    description="The IFT table uses Format 1 with a glyphCount field set to a value "
+                "that does not match the number of glyphs in the font (maxp.numGlyphs). "
+                "A conforming client must detect the mismatch during Interpret Format 1 "
+                "Patch Map and reject the font.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithFormat1MismatchedGlyphCount,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithFormat1InvalidPatchFormat(fontFormat, testName):
+    """
+    Replace the Format 2 IFT table with a hand-built Format 1 patch map whose
+    patchFormat field is set to 0, which is not one of the values from §6.1
+    Formats Summary (valid values are 1, 2, 3).
+
+    Tests conform-format1-valid-format-number: 'Must be set to one of the format
+    numbers from the §6.1 Formats Summary table.'
+
+    The constructed Format 1 table is otherwise well-formed (correct glyphCount,
+    null featureMap, empty entryIndex array since all font glyphs map to entry 0
+    implicitly); the only defect is the invalid patchFormat value, so a conforming
+    client must reject the font.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+
+    compatibility_id = bytes(raw[5:21])
+
+    num_glyphs = nft.font["maxp"].numGlyphs
+
+    header = bytearray()
+    header.append(1)                                  # format = 1
+    header.extend(b"\x00\x00\x00")                    # reserved (uint24)
+    header.append(0)                                  # flags
+    header.extend(compatibility_id)                   # compatibilityId[16]
+    header.extend(struct.pack(">H", 0))               # maxEntryIndex
+    header.extend(struct.pack(">H", 0))               # maxGlyphMapEntryIndex
+    header.extend(num_glyphs.to_bytes(3, "big"))      # glyphCount (uint24)
+
+    glyph_map_offset_pos = len(header)
+    header.extend(struct.pack(">I", 0))               # glyphMapOffset (uint32)
+    header.extend(struct.pack(">I", 0))               # featureMapOffset = 0 (null)
+
+    header.append(0)                                  # appliedEntriesBitMap[1]
+
+    url_template = bytes([0x80, 7]) + b".ift_tk"
+    header.extend(struct.pack(">H", len(url_template)))
+    header.extend(url_template)
+
+    header.append(0)                                  # patchFormat = 0 — INVALID
+
+    # firstMappedGlyph = glyphCount makes entryIndex[] zero-length, so every
+    # glyph is implicitly mapped to entry 0.
+    glyph_map = struct.pack(">H", num_glyphs)
+
+    struct.pack_into(">I", header, glyph_map_offset_pos, len(header))
+
+    new_ift = bytes(header) + glyph_map
+    nft.setIFTTableData(new_ift)
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-format1-valid-format-number"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Format 1 patch map with invalid patchFormat value",
+    description="The IFT table uses Format 1 with a patchFormat field set to 0, "
+                "which is not one of the format numbers listed in the §6.1 Formats "
+                "Summary table (valid values are 1, 2, and 3). A conforming client "
+                "must reject the font.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithFormat1InvalidPatchFormat,
     funcArgs=(identifierString,)
 )
 

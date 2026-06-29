@@ -135,3 +135,18 @@ def compute_id64_file_name(entry_id_int):
         raw = entry_id_int.to_bytes(4, 'big').lstrip(b'\x00')
         b = raw if raw else bytes([0])
     return base64.urlsafe_b64encode(b).decode('ascii')
+
+
+def compute_id64_no_strip(entry_id_int):
+    """
+    Encode an integer as base64url WITHOUT stripping leading zero bytes.
+
+    The spec (conform-entry-id-converted) requires leading zeros to be stripped
+    before base64url encoding. This helper deliberately omits that step, producing
+    the 'wrong' encoding used in negative tests that verify clients strip leading
+    zeros.
+    Example: integer 1 -> big-endian [0x00, 0x00, 0x00, 0x01] -> 'AAAAAQ=='
+             (correct encoding strips to [0x01] -> 'AQ==')
+    """
+    b = entry_id_int.to_bytes(4, 'big')  # always 4 bytes, no stripping
+    return base64.urlsafe_b64encode(b).decode('ascii')

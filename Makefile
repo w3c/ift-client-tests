@@ -14,7 +14,8 @@ tests: IFTClient/Tests/xhtml1/index.html
 IFTClient/Tests/xhtml1/index.html: \
 	build/IFT/GLYF/font.ift.woff2 build/IFT/CFF/font.ift.woff2 \
 	build/URL_TEMPLATE/IFT/GLYF/font.ift.woff2 build/URL_TEMPLATE/IFT/CFF/font.ift.woff2 \
-	build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf
+	build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf \
+	build/sequenceTest/IFT/GLYF/font.ift.woff2 build/sequenceTest/IFT/CFF/font.ift.woff2
 	cd generators/; python3 ./ClientTestCaseGenerator.py
 
 build/subsettedFonts/cff-ift.otf build/subsettedFonts/glyf-ift.ttf &: generators/sourceFonts/cff.otf  generators/sourceFonts/glyf.ttf
@@ -57,6 +58,40 @@ build/IFT/CFF/font.ift.woff2: build/config/cff_segmentation_plan.txtpb build/sub
 		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift.otf \
 		--plan=$(CURDIR)/build/config/cff_segmentation_plan.txtpb \
 		--output_path=$(CURDIR)/build/IFT/CFF \
+		--output_font="font.ift.woff2"
+
+build/sequenceTest/config/glyf_segmentation_plan.txtpb: generators/sourceFonts/glyf.ttf encoder/config/segmentation_config.txtpb
+	mkdir -p build/sequenceTest/config/
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
+	      --input_font=$(CURDIR)/generators/sourceFonts/glyf.ttf \
+	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
+	      --nooutput_segmentation_analysis \
+	      --include_initial_codepoints_in_config \
+	      --output_segmentation_plan > $(CURDIR)/build/sequenceTest/config/glyf_segmentation_plan.txtpb
+
+build/sequenceTest/config/cff_segmentation_plan.txtpb: generators/sourceFonts/cff.otf encoder/config/segmentation_config.txtpb
+	mkdir -p build/sequenceTest/config/
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
+	      --input_font=$(CURDIR)/generators/sourceFonts/cff.otf \
+	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
+	      --nooutput_segmentation_analysis \
+	      --include_initial_codepoints_in_config \
+	      --output_segmentation_plan > $(CURDIR)/build/sequenceTest/config/cff_segmentation_plan.txtpb
+
+build/sequenceTest/IFT/GLYF/font.ift.woff2: build/sequenceTest/config/glyf_segmentation_plan.txtpb generators/sourceFonts/glyf.ttf
+	mkdir -p build/sequenceTest/IFT/GLYF
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/generators/sourceFonts/glyf.ttf \
+		--plan=$(CURDIR)/build/sequenceTest/config/glyf_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/sequenceTest/IFT/GLYF \
+		--output_font="font.ift.woff2"
+
+build/sequenceTest/IFT/CFF/font.ift.woff2: build/sequenceTest/config/cff_segmentation_plan.txtpb generators/sourceFonts/cff.otf
+	mkdir -p build/sequenceTest/IFT/CFF
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/generators/sourceFonts/cff.otf \
+		--plan=$(CURDIR)/build/sequenceTest/config/cff_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/sequenceTest/IFT/CFF \
 		--output_font="font.ift.woff2"
 
 build/URL_TEMPLATE/IFT/GLYF/font.ift.woff2: build/config/glyf_segmentation_plan.txtpb build/subsettedFonts/glyf-ift.ttf

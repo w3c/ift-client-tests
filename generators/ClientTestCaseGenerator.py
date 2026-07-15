@@ -1265,6 +1265,277 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+# --------------------------------------------------------------------------
+# apply-glyph-keyed algorithm tests (spec §6.3.1 Applying Glyph Keyed Patches)
+#
+# These four sub-tests cover the important pieces of the Apply glyph keyed
+# patch algorithm (see issue #8):
+#   - Step 2: reject a patch whose compatibilityId does not match.
+#   - Step 3: reject a patch whose decoded size exceeds maxUncompressedLength.
+#   - Step 4: reject a patch that references a base table that is missing.
+#   - Step 4: correctly insert glyf/loca or CFF glyph data (positive control).
+#
+# All four share the "apply-glyph-keyed" algorithm conformance id (the id is an
+# algorithm statement in the spec), differentiated by an "_<name>" suffix so
+# check_coverage.py counts them as separate tests of the same algorithm.
+#
+# Glyph keyed patch header layout (used by the modifying tests):
+#   0-3:   format (Tag) = 'ifgk'
+#   4-7:   reserved (uint32)
+#   8:     flags (uint8)          -- bit 0: glyphIds use uint24 (else uint16)
+#   9-24:  compatibilityId (uint32[4], 16 bytes)
+#   25-28: maxUncompressedLength (uint32)
+#   29+:   brotliStream (compressed GlyphPatches table)
+# --------------------------------------------------------------------------
+
+def makeIFTWithMismatchedGlyphKeyedCompatId(fontFormat, testName):
+    """
+    Corrupt the compatibilityId field in each glyph-keyed patch so it no longer
+    matches the compatibility id from the base font's 'IFT '/'IFTX' table.
+
+    Tests apply-glyph-keyed step 2: 'Check that the compatibilityId field in
+    patch is equal to compatibility id. If there is no match ... patch
+    application has failed, return an error.'
+
+    A conforming client detects the mismatch and rejects the patch, so the IFT
+    font fails to render and the fallback font shows PASS.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+        # Flip the first byte of the 16-byte compatibilityId (bytes 9-24) so it
+        # is guaranteed to differ from the compatibility id declared in the base
+        # font's IFT table. This is the only defect introduced.
+        data[9] ^= 0xFF
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-glyph-keyed_reject-mismatched-compatibility-id"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch with mismatched compatibility id",
+    description="The compatibilityId field of each glyph-keyed patch is altered so "
+                "it no longer matches the compatibility id in the base font's IFT "
+                "table. A conforming client must reject the patch (Apply glyph keyed "
+                "patch, step 2), so the IFT font fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-glyph-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithMismatchedGlyphKeyedCompatId,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithGlyphKeyedDecodedSizeExceedingMax(fontFormat, testName):
+    """
+    Set maxUncompressedLength in each glyph-keyed patch to one less than the
+    actual decoded size of its brotli stream.
+
+    Tests apply-glyph-keyed step 3: 'Decode the brotli encoded data in
+    brotliStream ... If the decoded data is larger than maxUncompressedLength
+    return an error.'
+
+    Only the maxUncompressedLength header field is changed; the brotliStream is
+    left untouched, so the decoded GlyphPatches table is exactly one byte larger
+    than the declared maximum. A conforming client detects this and rejects the
+    patch, so the IFT font fails to render and the fallback font shows PASS.
+    """
+    import brotli
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+        decoded_length = len(brotli.decompress(bytes(data[29:])))
+        # Declare a maximum uncompressed length smaller than the true decoded
+        # size so decoding must exceed it. maxUncompressedLength is bytes 25-28.
+        struct.pack_into(">I", data, 25, decoded_length - 1)
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-glyph-keyed_reject-decoded-size-exceeds-max"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch decoded size exceeds maxUncompressedLength",
+    description="The maxUncompressedLength field of each glyph-keyed patch is set to "
+                "one less than the actual decoded size of its brotli stream. A "
+                "conforming client must reject the patch when the decoded data is "
+                "larger than maxUncompressedLength (Apply glyph keyed patch, step 3), "
+                "so the IFT font fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-glyph-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithGlyphKeyedDecodedSizeExceedingMax,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithMissingTableInGlyphPatch(fontFormat, testName):
+    """
+    Add a supported-type table entry ('gvar') that is absent from the base font
+    to each glyph-keyed patch, with zero-length glyph data for every glyph.
+
+    Tests apply-glyph-keyed step 4: 'If base font subset does not have a matching
+    table, return an error.' Unlike unsupported table types (which must be
+    ignored, see conform-table-entries-ignore-others), 'gvar' is one of the
+    supported table types (glyf, gvar, CFF, CFF2), so a conforming client must
+    process the entry, find that the base font has no 'gvar' table, and reject
+    the patch. The IFT font then fails to render and the fallback font shows PASS.
+
+    'gvar' sorts after both 'glyf' and 'CFF ', so appending it keeps the tables
+    array in ascending order (conform-glyph-keyed-tables-sort-ascending-unique),
+    making the missing base table the only defect.
+
+    GlyphPatches layout (decompressed):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24 per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[glyphCount * tableCount + 1] (Offset32 each)
+      then:  glyphData[variable]
+    """
+    import brotli
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for gkFile in glob.glob(os.path.join(destDir, "*_gk")):
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        flags = data[8]
+        gid_size = 3 if (flags & 1) else 2
+        decompressed = bytearray(brotli.decompress(bytes(data[29:])))
+
+        glyph_count = struct.unpack(">I", decompressed[0:4])[0]
+        table_count = decompressed[4]
+
+        tables_offset = 5 + glyph_count * gid_size
+        glyph_data_offsets_offset = tables_offset + table_count * 4
+        num_offsets = glyph_count * table_count + 1
+        glyph_data_start = glyph_data_offsets_offset + num_offsets * 4
+
+        # Appending 1 table tag (4 bytes) and glyph_count new offset entries
+        # (glyph_count * 4 bytes) shifts glyphData forward; every existing
+        # (absolute) offset must be adjusted by this delta.
+        offset_delta = 4 + glyph_count * 4
+        existing_offsets = [
+            struct.unpack(">I", decompressed[
+                glyph_data_offsets_offset + i * 4:
+                glyph_data_offsets_offset + i * 4 + 4
+            ])[0] + offset_delta
+            for i in range(num_offsets)
+        ]
+        new_sentinel = existing_offsets[-1]
+
+        new_decompressed = bytearray()
+        # glyphCount (unchanged)
+        new_decompressed.extend(struct.pack(">I", glyph_count))
+        # tableCount + 1
+        new_decompressed.append(table_count + 1)
+        # glyphIds (unchanged)
+        new_decompressed.extend(decompressed[5:tables_offset])
+        # existing table tags (unchanged)
+        new_decompressed.extend(decompressed[tables_offset:glyph_data_offsets_offset])
+        # new supported-but-missing table tag, appended in ascending order
+        new_decompressed.extend(b'gvar')
+        # adjusted existing offsets minus the sentinel
+        for off in existing_offsets[:-1]:
+            new_decompressed.extend(struct.pack(">I", off))
+        # glyph_count new offsets for 'gvar', all equal to new_sentinel (zero-length data)
+        for _ in range(glyph_count):
+            new_decompressed.extend(struct.pack(">I", new_sentinel))
+        # new sentinel
+        new_decompressed.extend(struct.pack(">I", new_sentinel))
+        # glyph data (unchanged)
+        new_decompressed.extend(decompressed[glyph_data_start:])
+
+        recompressed = brotli.compress(bytes(new_decompressed))
+        struct.pack_into(">I", data, 25, len(new_decompressed))
+        data[29:] = recompressed
+
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-glyph-keyed_reject-missing-table"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch references a table missing from the base font",
+    description="Each glyph-keyed patch is given an additional entry for the supported "
+                "table 'gvar', which is not present in the base font. A conforming client "
+                "must reject the patch because the base font has no matching table (Apply "
+                "glyph keyed patch, step 4), so the IFT font fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-glyph-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithMissingTableInGlyphPatch,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithValidGlyphKeyedPatch(fontFormat, testName):
+    """
+    Build a test from a valid, unmodified glyph-keyed patch as a positive control
+    for the apply-glyph-keyed algorithm.
+
+    Tests apply-glyph-keyed step 4 (glyph data insertion): a conforming client
+    must apply the valid glyph-keyed patch, synthesizing the glyf/loca (GLYF) or
+    CFF (CFF) table with the patched per-glyph data inserted. The base subset has
+    empty outlines for the patched glyphs, so the ligatures that render 'PASS'
+    only appear when the client correctly inserts the glyph data from the patch.
+
+    shouldShowIFT=True: correct insertion renders 'PASS' via the IFT font; a
+    client that fails to apply the glyph-keyed patch leaves the glyphs empty and
+    shows FAIL.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-glyph-keyed_insert-glyph-data"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Glyph keyed patch glyph data is inserted correctly",
+    description="A valid, unmodified glyph-keyed patch is applied. The base subset has "
+                "empty outlines for the patched glyphs, so the IFT font renders 'PASS' "
+                "only if the client correctly inserts the glyf/loca (GLYF) or CFF (CFF) "
+                "glyph data from the patch (Apply glyph keyed patch, step 4).",
+    shouldShowIFT=True,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-glyph-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithValidGlyphKeyedPatch,
+    funcArgs=(identifierString,)
+)
+
+
 # ------------------
 # Generate the Index
 # ------------------

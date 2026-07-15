@@ -102,3 +102,43 @@ h2.testCategory {
 	width: 50%;
 }
 
+/* sequence tests */
+
+.sequence-item {
+	margin: 6px 0px 6px 0px;
+	padding: 4px 0px 4px 0px;
+}
+
+.sequence-item.sequence-render {
+	border-left: 3px solid #666;
+	padding-left: 8px;
+}
+
+.sequence-item.sequence-assert {
+	border-left: 3px solid #2a7;
+	padding-left: 8px;
+}
+
+.assert-result {
+	font-weight: bold;
+	font-family: monospace;
+	padding: 1px 6px;
+	border-radius: 3px;
+}
+
+.assert-result.pending {
+	color: #666;
+	background-color: #eee;
+}
+
+.assert-result.pass {
+	color: #fff;
+	background-color: #2a7;
+}
+
+.assert-result.fail {
+	color: #fff;
+	background-color: #c33;
+}
+
+

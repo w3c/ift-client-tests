@@ -6,6 +6,7 @@ import os
 import html
 
 from testCaseGeneratorLib.paths import clientTestResourcesDirectory
+from testCaseGeneratorLib.assertions import BUILTIN_ASSERTIONS
 
 # ------------------------
 # Specification URLs
@@ -75,6 +76,164 @@ def poorManMath(text):
     import re
     return re.sub(r"\^\{(.*.)\}", r"<sup>\1</sup>", text)
 
+
+def _emit_assert_paragraph(html_string, test_id, font_format, assertion):
+    type_id = assertion["assert"]
+    spec = BUILTIN_ASSERTIONS[type_id]
+    label = spec.label(assertion["value"], assertion.get("scope"))
+    span = spec.emit_html(
+        test_id,
+        font_format,
+        assertion["value"],
+        assertion.get("scope"),
+        assertion.get("config") or None,
+    )
+    html_string.append(
+        "\t\t\t\t\t<p>%s: %s (%s)</p>"
+        % (html.escape(label), span, font_format)
+    )
+
+
+def _emit_single_shot_test(html_string, test):
+    identifier = test["identifier"]
+    title = html.escape(test["title"])
+    description = html.escape(test["description"])
+    shouldShowIFT = test["shouldShowIFT"]
+    fontFormats = test["fontFormats"]
+    char = "P" if shouldShowIFT else "F"
+    specLink = test["specLink"]
+    assertions = test.get("assertions") or []
+
+    html_string.append("\t\t<div class=\"testCase\" id=\"%s\">" % identifier)
+    html_string.append("\t\t\t<div class=\"testCaseOverview\">")
+    html_string.append(
+        "\t\t\t\t<h3><a href=\"#%s\">%s</a>: %s</h3>" % (identifier, identifier, title)
+    )
+    html_string.append("\t\t\t\t<p>%s</p>" % description)
+    html_string.append("\t\t\t</div>")
+    html_string.append("\t\t\t<div class=\"testCaseDetails\">")
+
+    render_text = "Should Render IFT" if shouldShowIFT else "Should Not Render IFT"
+    for fontFormat in fontFormats:
+        format_identifier = "%s-%s" % (fontFormat, identifier)
+        string = (
+            '%s: <span id="%s" data-format="%s" class="result">%s</span> (%s)'
+            % (render_text, format_identifier, fontFormat, char, fontFormat)
+        )
+        html_string.append("\t\t\t\t\t<p>%s</p>" % string)
+        for assertion in assertions:
+            _emit_assert_paragraph(html_string, identifier, fontFormat, assertion)
+
+    if specLink is not None:
+        links = specLink.split(" ")
+        html_string.append("\t\t\t\t\t<p>")
+        for link in links:
+            name = "Documentation"
+            if "#" in link:
+                name = link.split("#")[1]
+            html_string.append("\t\t\t\t\t\t<a href=\"%s\">%s</a> " % (link, name))
+        html_string.append("\t\t\t\t\t</p>")
+
+    html_string.append("\t\t\t</div>")
+    html_string.append("\t\t</div>")
+
+
+def _emit_sequence_test(html_string, test):
+    identifier = test["identifier"]
+    title = html.escape(test["title"])
+    description = html.escape(test["description"])
+    shouldShowIFT = test["shouldShowIFT"]
+    fontFormats = test["fontFormats"]
+    char = "P" if shouldShowIFT else "F"
+    specLink = test["specLink"]
+    sequence = test.get("sequence") or []
+
+    html_string.append(
+        "\t\t<div class=\"testCase sequence\" id=\"%s\">" % identifier
+    )
+    html_string.append("\t\t\t<div class=\"testCaseOverview\">")
+    html_string.append(
+        "\t\t\t\t<h3><a href=\"#%s\">%s</a>: %s</h3>" % (identifier, identifier, title)
+    )
+    html_string.append("\t\t\t\t<p>%s</p>" % description)
+    html_string.append("\t\t\t</div>")
+
+    for fontFormat in fontFormats:
+        html_string.append(
+            "\t\t\t<div class=\"testCaseDetails\" data-format=\"%s\" data-test-id=\"%s\">"
+            % (fontFormat, identifier)
+        )
+
+        if shouldShowIFT is not None:
+            # Visual P/F inside sequence — legacy loader skips .testCase.sequence
+            format_identifier = "%s-%s" % (fontFormat, identifier)
+            render_text = (
+                "Should Render IFT" if shouldShowIFT else "Should Not Render IFT"
+            )
+            string = (
+                '%s: <span id="%s" data-format="%s" class="result">%s</span> (%s)'
+                % (render_text, format_identifier, fontFormat, char, fontFormat)
+            )
+            html_string.append("\t\t\t\t\t<p>%s</p>" % string)
+
+        last_render_index = None
+        for seq_index, item in enumerate(sequence):
+            if "action" in item:
+                last_render_index = seq_index
+                text = html.escape(item["text"])
+                html_string.append(
+                    "\t\t\t\t<div class=\"sequence-item sequence-render\" "
+                    "data-seq-index=\"%d\" data-test-id=\"%s\" data-format=\"%s\">"
+                    % (seq_index, identifier, fontFormat)
+                )
+                html_string.append(
+                    "\t\t\t\t\t<p>Render: <span class=\"render-text\">%s</span></p>"
+                    % text
+                )
+                html_string.append("\t\t\t\t</div>")
+            else:
+                after = (
+                    ' data-after-render="%d"' % last_render_index
+                    if last_render_index is not None
+                    else ""
+                )
+                html_string.append(
+                    "\t\t\t\t<div class=\"sequence-item sequence-assert\" "
+                    "data-seq-index=\"%d\"%s>"
+                    % (seq_index, after)
+                )
+                type_id = item["assert"]
+                spec = BUILTIN_ASSERTIONS[type_id]
+                label = html.escape(spec.label(item["value"], item.get("scope")))
+                span = spec.emit_html(
+                    identifier,
+                    fontFormat,
+                    item["value"],
+                    item.get("scope"),
+                    item.get("config") or None,
+                )
+                html_string.append(
+                    "\t\t\t\t\t<p>%s: %s</p>" % (label, span)
+                )
+                html_string.append("\t\t\t\t</div>")
+
+        if specLink is not None:
+            links = specLink.split(" ")
+            html_string.append("\t\t\t\t\t<p>")
+            for link in links:
+                name = "Documentation"
+                if "#" in link:
+                    name = link.split("#")[1]
+                html_string.append(
+                    "\t\t\t\t\t\t<a href=\"%s\">%s</a> " % (link, name)
+                )
+            html_string.append("\t\t\t\t\t</p>")
+
+        html_string.append("\t\t\t</div>")
+
+    html_string.append("\t\t</div>")
+
+
 def generateClientIndexHTML(directory=None, testCases=[], note=None):
     testCount = sum([len(group["testCases"]) for group in testCases])
     html_string = [
@@ -126,54 +285,10 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
             html_string.append("\t\t</div>")
         # write the individual test cases
         for test in group["testCases"]:
-            identifier = test["identifier"]
-            title = test["title"]
-            title = html.escape(title)
-            description = test["description"]
-            description = html.escape(description)
-            shouldShowIFT = test["shouldShowIFT"]
-            fontFormats = test["fontFormats"]
-            if shouldShowIFT:
-                shouldShowIFT = "P"
+            if test.get("sequential"):
+                _emit_sequence_test(html_string, test)
             else:
-                shouldShowIFT = "F"
-            specLink = test["specLink"]
-            # start the test case div
-            html_string.append("\t\t<div class=\"testCase\" id=\"%s\">" % identifier)
-            # start the overview div
-            html_string.append("\t\t\t<div class=\"testCaseOverview\">")
-            # title
-            html_string.append("\t\t\t\t<h3><a href=\"#%s\">%s</a>: %s</h3>" % (identifier, identifier, title))
-            # assertion
-            html_string.append("\t\t\t\t<p>%s</p>" % description)
-            # close the overview div
-            html_string.append("\t\t\t</div>")
-            # start the details div
-            html_string.append("\t\t\t<div class=\"testCaseDetails\">")
-            # validity
-            
-            render_text = "Should Render IFT" if shouldShowIFT != "F" else "Should Not Render IFT"
-            for fontFormat in fontFormats:
-                format_identifier = "%s-%s" % (fontFormat, identifier)
-                string = "%s: <span id=\"%s\" data-format=\"%s\" class=\"result\">%s</span> (%s)" % (render_text, format_identifier,fontFormat,shouldShowIFT,fontFormat)
-                html_string.append("\t\t\t\t\t<p>%s</p>" % string)
-            # documentation
-            if specLink is not None:
-                links = specLink.split(' ')
-
-                html_string.append("\t\t\t\t\t<p>")
-                for link in links:
-                    name = 'Documentation'
-                    if '#' in link:
-                        name = link.split('#')[1]
-                    string = "\t\t\t\t\t\t<a href=\"%s\">%s</a> " % (link, name)
-                    html_string.append(string)
-                html_string.append("\t\t\t\t\t</p>")
-
-            # close the details div
-            html_string.append("\t\t\t</div>")
-            # close the test case div
-            html_string.append("\t\t</div>")
+                _emit_single_shot_test(html_string, test)
     # close body
     html_string.append("\t</body>")
     # close html

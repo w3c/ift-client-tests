@@ -35,6 +35,7 @@ from testCaseGeneratorLib.paths import (
 )
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
+from testCaseGeneratorLib.assertions import normalize_assertion_item, normalize_sequence_item
 from testCaseGeneratorLib.helpers import (
     decode_id32_to_int,
     id32_no_strip,
@@ -88,6 +89,12 @@ destPath = os.path.join(clientTestResourcesDirectory, "ift.js")
 if os.path.exists(destPath):
     os.remove(destPath)
 shutil.copy(os.path.join(resourcesDirectory, "ift.js"), destPath)
+
+# ift assertions js
+destPath = os.path.join(clientTestResourcesDirectory, "ift-assertions.js")
+if os.path.exists(destPath):
+    os.remove(destPath)
+shutil.copy(os.path.join(resourcesDirectory, "ift-assertions.js"), destPath)
 
 # brotli JS
 destPath = os.path.join(clientTestResourcesDirectory,"cc-client")
@@ -143,7 +150,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False):
+def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False, assertions=None):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -170,6 +177,9 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
     shouldShowIFT: A boolean indicating if the SFNT is valid enough for
     conversion to WOFF.
 
+    assertions: Optional list of assertion dicts (frozen schema) evaluated after
+    the single render. Default scope for patch asserts is "cumulative".
+
     """
     print("Compiling %s..." % identifier)
     for fontFormat in fontFormats:
@@ -186,6 +196,13 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
 
     specLink = expandSpecLinks(specLink)
 
+    normalized_assertions = []
+    if assertions:
+        for item in assertions:
+            normalized_assertions.append(
+                normalize_assertion_item(item, default_scope="cumulative")
+            )
+
     # register the test
     tag = identifier.split("-")[0]
     testRegistry[tag].append(
@@ -196,6 +213,53 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
             shouldShowIFT=shouldShowIFT,
             specLink=specLink,
             fontFormats=fontFormats,
+            sequential=False,
+            assertions=normalized_assertions,
+            sequence=None,
+        )
+    )
+
+
+def writeSequenceTest(identifier, title, description, fontFormats, func, sequence, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False):
+    """
+    Register a multi-render sequence test with interleaved actions and assertions.
+
+    sequence: list of items, each either:
+      {"action": "render", "text": "..."}
+      {"assert": "<type_id>", "value": ..., "scope": "delta"|"cumulative", "config": {...}}
+    """
+    print("Compiling sequence %s..." % identifier)
+    for fontFormat in fontFormats:
+        if funcArgs is not None:
+            func(fontFormat, *funcArgs)
+        else:
+            func(fontFormat)
+    assert identifier not in registeredIdentifiers, "Duplicate identifier! %s" % identifier
+    assert title not in registeredTitles, "Duplicate title! %s" % title
+    assert description not in registeredDescriptions, "Duplicate description! %s" % description
+    assert sequence, "writeSequenceTest requires a non-empty sequence"
+    registeredIdentifiers.add(identifier)
+    registeredTitles.add(title)
+    registeredDescriptions.add(description)
+
+    specLink = expandSpecLinks(specLink)
+
+    normalized_sequence = [
+        normalize_sequence_item(item, default_scope="delta") for item in sequence
+    ]
+
+    tag = identifier.split("-")[0]
+    testRegistry[tag].append(
+        dict(
+            identifier=identifier,
+            title=title,
+            description=description,
+            shouldShowIFT=shouldShowIFT,
+            specLink=specLink,
+            fontFormats=fontFormats,
+            sequential=True,
+            assertions=[],
+            sequence=normalized_sequence,
         )
     )
 

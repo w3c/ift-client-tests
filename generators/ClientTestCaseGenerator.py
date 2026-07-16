@@ -658,12 +658,13 @@ for suffix, title, description, template_bytes in _url_template_negative_tests:
 
 
 def madeIFTWithCustomURLTemplate(fontFormat, testName):
-    # copy build/URL_TEMPLATE/IFT/{fontFormat} to test directory if not exists
-    if not os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat)):
-        shutil.copytree(os.path.join(buildDirectory, "URL_TEMPLATE", "IFT", fontFormat), os.path.join(clientTestDirectory, testName, fontFormat))
-    # rename the font.ift.woff2 file to myfont-mod.ift.woff2 if exists
-    if os.path.exists(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2")):
-        os.rename(os.path.join(clientTestDirectory, testName, fontFormat, "font.ift.woff2"), os.path.join(clientTestDirectory, testName, fontFormat, "myfont-mod.ift.woff2"))
+    nft = IFTFile(
+        testName,
+        fontFormat,
+        IFT_FONT_FILENAME,
+        sourceRelativeDir=os.path.join("URL_TEMPLATE", "IFT"),
+    )
+    nft.writeTestIFTFile()
 
 testTag = "url-template-prefix"
 identifierString= "%s-%s" % (testType, testTag)
@@ -1331,28 +1332,25 @@ writeTest(
 
 
 def makeSequenceTestIFT(fontFormat, testName):
-    """Copy sequenceTest IFT assets, plus subsetted ligature font under visual/."""
-    dest_dir = os.path.join(clientTestDirectory, testName, fontFormat)
-    if not os.path.exists(dest_dir):
-        shutil.copytree(
-            os.path.join(buildDirectory, "sequenceTest", "IFT", fontFormat),
-            dest_dir,
-        )
-    font_path = os.path.join(dest_dir, "font.ift.woff2")
-    if os.path.exists(font_path):
-        os.rename(font_path, os.path.join(dest_dir, IFT_FONT_FILENAME))
+    """Place sequenceTest IFT assets, plus subsetted ligature font under visual/."""
+    # Multi-segment font used by sequence renders / patch asserts.
+    nonSubsettedIFT = IFTFile(
+        testName,
+        fontFormat,
+        IFT_FONT_FILENAME,
+        sourceRelativeDir=os.path.join("sequenceTest", "IFT"),
+    )
+    nonSubsettedIFT.writeTestIFTFile()
 
-    # Separate tree for shouldShowIFT P/F ligature (subsetted build/IFT font).
-    # Kept under visual/ so patch filenames do not collide with sequenceTest.
-    visual_dir = os.path.join(dest_dir, "visual")
-    if not os.path.exists(visual_dir):
-        shutil.copytree(
-            os.path.join(buildDirectory, "IFT", fontFormat),
-            visual_dir,
-        )
-    visual_font = os.path.join(visual_dir, "font.ift.woff2")
-    if os.path.exists(visual_font):
-        os.rename(visual_font, os.path.join(visual_dir, IFT_FONT_FILENAME))
+    # Separate tree for shouldShowIFT P/F ligature (default build/IFT font).
+    subsettedIFT = IFTFile(
+        testName,
+        fontFormat,
+        IFT_FONT_FILENAME,
+        sourceRelativeDir="IFT",
+        destSubdir="visual",
+    )
+    subsettedIFT.writeTestIFTFile()
 
 
 # Segment picks (sequenceTest plans; initial font excludes these codepoints):

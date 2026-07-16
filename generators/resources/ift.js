@@ -163,9 +163,19 @@ function update_fonts(text, font_id, font_face, features, ds) {
   return patch_codepoints(font_id, font_face, cps_array, features, axes);
 }
 
+/** Stable font URL per sequence case so IftState stays incremental across renders. */
+const sequenceFontUrls = new Map();
+
 function extendSubset(testId, format, fontName, cumulativeText, prevText) {
-  const rndNum = Math.floor(Math.random() * 100000);
-  const fontUrl = `${testId}/${format}/myfont-mod.ift.woff2?v=${rndNum}`;
+  const key = patchKey(testId, format);
+  if (!sequenceFontUrls.has(key)) {
+    const rndNum = Math.floor(Math.random() * 100000);
+    sequenceFontUrls.set(
+      key,
+      `${testId}/${format}/myfont-mod.ift.woff2?v=${rndNum}`
+    );
+  }
+  const fontUrl = sequenceFontUrls.get(key);
   // First render: request all codepoints in cumulative text.
   // Later renders: only add newly introduced codepoints (IftState is incremental).
   const cps =
@@ -177,7 +187,7 @@ function extendSubset(testId, format, fontName, cumulativeText, prevText) {
   return patch_codepoints(fontUrl, fontName, cps, [], new Map());
 }
 
-function applyFontToSequenceVisuals(testId, format, fontName) {
+function applyFontToSequenceRenders(testId, format, fontName) {
   const testCase = document.getElementById(testId);
   if (!testCase || !testCase.classList.contains('sequence')) return;
   const details = testCase.querySelector(
@@ -185,8 +195,41 @@ function applyFontToSequenceVisuals(testId, format, fontName) {
   );
   if (!details) return;
   const fallback = 'RobotoFallback';
-  for (const el of details.querySelectorAll('.result, .render-text')) {
+  for (const el of details.querySelectorAll('.render-text')) {
     el.style.fontFamily = `${fontName}, ${fallback}`;
+  }
+}
+
+/**
+ * Load the subsetted ligature IFT font into a dedicated FontFace for .result.
+ * Uses {testId}/{format}/visual/ so it does not share state or patches with
+ * the sequence font.
+ */
+async function loadSequenceLigatureResult(testId, format) {
+  const testCase = document.getElementById(testId);
+  if (!testCase || !testCase.classList.contains('sequence')) return;
+  const details = testCase.querySelector(
+    `.testCaseDetails[data-format="${format}"]`
+  );
+  if (!details) return;
+  const resultEl = details.querySelector('.result');
+  if (!resultEl) return;
+
+  const visualFontName = `${format}-${testId}-Visual-IFT-Font`;
+  const fallback = 'RobotoFallback';
+  resultEl.style.fontFamily = `${visualFontName}, ${fallback}`;
+
+  const sample = resultEl.textContent.trim() === 'F' ? 'FAIL' : 'PASS';
+  const rndNum = Math.floor(Math.random() * 100000);
+  const fontUrl = `${testId}/${format}/visual/myfont-mod.ift.woff2?v=${rndNum}`;
+  try {
+    const font = await update_fonts(sample, fontUrl, visualFontName, [], {});
+    document.fonts.add(font);
+  } catch (e) {
+    console.error(
+      `Visual ligature font failed for ${testId}/${format}:`,
+      e
+    );
   }
 }
 
@@ -288,7 +331,7 @@ async function runRenderAction(item, state) {
       state.prevText
     );
     document.fonts.add(font);
-    applyFontToSequenceVisuals(testId, format, fontName);
+    applyFontToSequenceRenders(testId, format, fontName);
     fontLoaded = true;
   } catch (e) {
     loadError = e;
@@ -333,6 +376,9 @@ async function run_sequence_tests() {
         prevText: '',
         lastRender: null,
       };
+
+      // Ligature P/F check uses the subsetted visual font (separate FontFace).
+      await loadSequenceLigatureResult(testId, format);
 
       const items = [
         ...details.querySelectorAll('.sequence-item'),

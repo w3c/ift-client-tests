@@ -1329,6 +1329,81 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
+
+def makeSequenceTestIFT(fontFormat, testName):
+    """Copy sequenceTest IFT assets, plus subsetted ligature font under visual/."""
+    dest_dir = os.path.join(clientTestDirectory, testName, fontFormat)
+    if not os.path.exists(dest_dir):
+        shutil.copytree(
+            os.path.join(buildDirectory, "sequenceTest", "IFT", fontFormat),
+            dest_dir,
+        )
+    font_path = os.path.join(dest_dir, "font.ift.woff2")
+    if os.path.exists(font_path):
+        os.rename(font_path, os.path.join(dest_dir, IFT_FONT_FILENAME))
+
+    # Separate tree for shouldShowIFT P/F ligature (subsetted build/IFT font).
+    # Kept under visual/ so patch filenames do not collide with sequenceTest.
+    visual_dir = os.path.join(dest_dir, "visual")
+    if not os.path.exists(visual_dir):
+        shutil.copytree(
+            os.path.join(buildDirectory, "IFT", fontFormat),
+            visual_dir,
+        )
+    visual_font = os.path.join(visual_dir, "font.ift.woff2")
+    if os.path.exists(visual_font):
+        os.rename(visual_font, os.path.join(visual_dir, IFT_FONT_FILENAME))
+
+
+# Segment picks (sequenceTest plans; initial font excludes these codepoints):
+#   - 'F' maps to a single shared patch entry on both GLYF (entry 49) and CFF (24)
+#   - '$' maps to a distinct additional entry (GLYF 92 / CFF 0)
+#   - 'Q' is covered by the same first entry as 'F', so after remove-entries it
+#     must not fetch patches again.
+# Filenames pinned via PerformanceObserver Resource Timing (prefetch may yield
+# more than one URI per mapping entry).
+testTag = "remove-entries-format-2"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+_PATCH_F = {
+    "GLYF": ["DO.ift_tk", "00.1.ift_gk", "6C.1.ift_gk", "6G.1.ift_gk"],
+    "CFF": ["3O.ift_tk", "00.1.ift_gk"],
+}
+_PATCH_DOLLAR = {
+    "GLYF": ["14.1.ift_gk"],
+    "CFF": ["0C.1.ift_gk"],
+}
+_PATCH_CUMULATIVE = {
+    "GLYF": _PATCH_F["GLYF"] + _PATCH_DOLLAR["GLYF"],
+    "CFF": _PATCH_F["CFF"] + _PATCH_DOLLAR["CFF"],
+}
+writeSequenceTest(
+    identifier=identifierString,
+    title="Remove entries from Format 2 after applying patches",
+    description=(
+        "After a Format 2 patch is applied, Remove Entries from Format 2 marks the "
+        "matching mapping entry ignored so a later codepoint from the same segment "
+        "does not fetch that patch again. Render 'F' (first segment/patch), then "
+        "'$' (second segment/patch), then 'Q' (same first-segment coverage as 'F') "
+        "and expect no new patches while both patch sets remain loaded cumulatively."
+    ),
+    shouldShowIFT=True,
+    credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
+    specLink="#remove-entries-format-2",
+    fontFormats=fontFormats,
+    func=makeSequenceTestIFT,
+    funcArgs=(identifierString,),
+    sequence=[
+        {"action": "render", "text": "F"},
+        {"assert": "patches_loaded", "value": _PATCH_F, "scope": "delta"},
+        {"action": "render", "text": "$"},
+        {"assert": "patches_loaded", "value": _PATCH_DOLLAR, "scope": "delta"},
+        {"action": "render", "text": "Q"},
+        {"assert": "patches_not_loaded", "value": True, "scope": "delta"},
+        {"assert": "patches_loaded", "value": _PATCH_CUMULATIVE, "scope": "cumulative"},
+    ],
+)
+
 # ------------------
 # Generate the Index
 # ------------------

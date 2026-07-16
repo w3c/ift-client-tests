@@ -77,7 +77,25 @@ def _validate_patch_assert_value(value, type_id):
                 "patches_not_loaded=False is invalid; use True or a list of filenames"
             )
         return
+    # Per-format maps: {"GLYF": [...], "CFF": [...]} (or a subset of formats).
+    if isinstance(value, dict):
+        if not value:
+            raise ValueError("%s format map must not be empty" % type_id)
+        for fmt, names in value.items():
+            if not isinstance(fmt, str):
+                raise TypeError("%s format keys must be strings, got %r" % (type_id, fmt))
+            _validate_patch_names(names, "%s[%s]" % (type_id, fmt))
+        return
     _validate_patch_names(value, type_id)
+
+
+def _patch_value_label(value):
+    if isinstance(value, dict):
+        parts = []
+        for fmt in sorted(value.keys()):
+            parts.append("%s=%s" % (fmt, ", ".join(value[fmt])))
+        return "; ".join(parts)
+    return ", ".join(value)
 
 
 @register_assertion
@@ -94,7 +112,7 @@ class PatchesLoadedAssertion(AssertionSpec):
             return "Should Load Patches"
         if value is False:
             return "Should Not Load Patches"
-        return "Should Load Patches: " + ", ".join(value)
+        return "Should Load Patches: " + _patch_value_label(value)
 
 
 @register_assertion
@@ -109,7 +127,7 @@ class PatchesNotLoadedAssertion(AssertionSpec):
     def label(self, value, scope):
         if value is True:
             return "Should Not Load Patches"
-        return "Should Not Load Patches: " + ", ".join(value)
+        return "Should Not Load Patches: " + _patch_value_label(value)
 
 
 def normalize_assertion_item(item, default_scope=None):

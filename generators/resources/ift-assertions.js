@@ -1,6 +1,6 @@
 /**
  * IFT assertion registry — built-in handlers and serialize/deserialize helpers.
- * Import from ift.js. Add new types here with registerAssertion + matching Python AssertionSpec.
+ * Add new types here with registerAssertion + matching Python AssertionSpec.
  */
 
 export const assertionHandlers = {};
@@ -25,7 +25,26 @@ export function deserializeAssertSpan(span) {
   };
 }
 
+function resolveAssertValue(item) {
+  const value = item.value;
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (Object.prototype.hasOwnProperty.call(value, 'GLYF') ||
+      Object.prototype.hasOwnProperty.call(value, 'CFF'))
+  ) {
+    const format = item.format;
+    if (!Object.prototype.hasOwnProperty.call(value, format)) {
+      return undefined;
+    }
+    return value[format];
+  }
+  return value;
+}
+
 function patchesMatchAllow(loadedBasenames, value) {
+  if (value === undefined) return false;
   if (value === true) return loadedBasenames.size > 0;
   if (value === false) return loadedBasenames.size === 0;
   if (!Array.isArray(value) || value.length === 0) return false;
@@ -33,6 +52,7 @@ function patchesMatchAllow(loadedBasenames, value) {
 }
 
 function patchesMatchDeny(loadedBasenames, value) {
+  if (value === undefined) return false;
   if (value === true) return loadedBasenames.size === 0;
   if (!Array.isArray(value) || value.length === 0) return true;
   return value.every((name) => !loadedBasenames.has(name));
@@ -44,11 +64,11 @@ function scopedPatches(ctx, item) {
 }
 
 registerAssertion('patches_loaded', (ctx, item) => {
-  return patchesMatchAllow(scopedPatches(ctx, item), item.value);
+  return patchesMatchAllow(scopedPatches(ctx, item), resolveAssertValue(item));
 });
 
 registerAssertion('patches_not_loaded', (ctx, item) => {
-  return patchesMatchDeny(scopedPatches(ctx, item), item.value);
+  return patchesMatchDeny(scopedPatches(ctx, item), resolveAssertValue(item));
 });
 
 export function runAssertion(span, ctx) {
@@ -75,6 +95,7 @@ export function runAssertion(span, ctx) {
     return;
   }
 
+  const resolvedValue = resolveAssertValue(item);
   const passed = handler(ctx, item);
   span.textContent = passed ? 'PASS' : 'FAIL';
   span.classList.remove('pending');
@@ -85,7 +106,7 @@ export function runAssertion(span, ctx) {
   span.title = [
     `Assert: ${item.assert}`,
     `Scope: ${scope}`,
-    `Value: ${JSON.stringify(item.value)}`,
+    `Value: ${JSON.stringify(resolvedValue)}`,
     Object.keys(item.config || {}).length
       ? `Config: ${JSON.stringify(item.config)}`
       : null,

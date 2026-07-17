@@ -1331,7 +1331,7 @@ writeTest(
 )
 
 
-def makeSequenceTestIFT(fontFormat, testName):
+def RemoveEntriesFormat2(fontFormat, testName):
     """Place sequenceTest IFT assets, plus subsetted ligature font under visual/."""
     # Multi-segment font used by sequence renders / patch asserts.
     nonSubsettedIFT = IFTFile(
@@ -1358,14 +1358,12 @@ def makeSequenceTestIFT(fontFormat, testName):
 #   - '$' maps to a distinct additional entry (GLYF 92 / CFF 0)
 #   - 'Q' is covered by the same first entry as 'F', so after remove-entries it
 #     must not fetch patches again.
-# Filenames pinned via PerformanceObserver Resource Timing (prefetch may yield
-# more than one URI per mapping entry).
 testTag = "remove-entries-format-2"
 identifierString = "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF", "CFF"]
 _PATCH_F = {
-    "GLYF": ["DO.ift_tk", "00.1.ift_gk", "6C.1.ift_gk", "6G.1.ift_gk"],
-    "CFF": ["3O.ift_tk", "00.1.ift_gk"],
+    "GLYF": ["DO.ift_tk"],
+    "CFF": ["3O.ift_tk"],
 }
 _PATCH_DOLLAR = {
     "GLYF": ["14.1.ift_gk"],
@@ -1389,15 +1387,30 @@ writeSequenceTest(
     credits=[dict(title="Yongji Chen", role="author", link="https://github.com/yChenMonotype")],
     specLink="#remove-entries-format-2",
     fontFormats=fontFormats,
-    func=makeSequenceTestIFT,
+    func=RemoveEntriesFormat2,
     funcArgs=(identifierString,),
     sequence=[
+        # push 'F' into the client 
         {"action": "render", "text": "F"},
+        # Expect some patches to be loaded
+        {"assert": "patches_loaded", "value": True, "scope": "delta"},
+        # Expect the patches to be the same as the ones in the _PATCH_F dictionary
         {"assert": "patches_loaded", "value": _PATCH_F, "scope": "delta"},
+        # push '$' into the client
         {"action": "render", "text": "$"},
+        # Expect some patches to be loaded
+        {"assert": "patches_loaded", "value": True, "scope": "delta"},
+        # Expect the patches to be the same as the ones in the _PATCH_DOLLAR dictionary
         {"assert": "patches_loaded", "value": _PATCH_DOLLAR, "scope": "delta"},
+        # push 'Q' into the client
         {"action": "render", "text": "Q"},
+        # Expect no patches to be loaded
+        {"assert": "patches_loaded", "value": False, "scope": "delta"},
+        # Expect no patches to be loaded
         {"assert": "patches_not_loaded", "value": True, "scope": "delta"},
+        # Expect some patches to be loaded
+        {"assert": "patches_loaded", "value": True, "scope": "cumulative"},
+        # Expect the patches to be the same as the ones in the _PATCH_CUMULATIVE dictionary
         {"assert": "patches_loaded", "value": _PATCH_CUMULATIVE, "scope": "cumulative"},
     ],
 )

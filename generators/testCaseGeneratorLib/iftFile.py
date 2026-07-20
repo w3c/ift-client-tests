@@ -1,6 +1,7 @@
 import os
 import shutil
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.tables.DefaultTable import DefaultTable
 from testCaseGeneratorLib.paths import clientTestDirectory, buildDirectory
 
 class IFTFile:
@@ -54,15 +55,20 @@ class IFTFile:
     def getIFTTableData(self):
         if "IFT " not in self.font:
             raise ValueError("IFT table not found in font.")
-        # Unknown/custom tables are stored as raw bytes on .data
         self.tbl = self.font["IFT "]
-        self.raw = bytearray(self.tbl.data)
+        # fontTools (>= 4.63) decodes "IFT " into a structured table_I_F_T_,
+        # so compile it back to the on-disk bytes for byte-level callers.
+        self.raw = bytearray(self.tbl.compile(self.font))
         return self.raw
 
     def setIFTTableData(self, data):
         self.raw = bytearray(data)
-        if self.tbl is not None:
-            self.tbl.data = bytes(self.raw)
+        # Swap in a raw DefaultTable to bypass fontTools table validation
+        # so that intentionally malformed bytes can be written verbatim.
+        rawTable = DefaultTable("IFT ")
+        rawTable.data = bytes(self.raw)
+        self.font["IFT "] = rawTable
+        self.tbl = rawTable
 
     def removeTable(self, tableTag):
         del self.font[tableTag]

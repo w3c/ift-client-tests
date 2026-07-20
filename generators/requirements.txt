@@ -1,1 +1,2 @@
-fonttools==4.28.5
+fonttools>=4.63.0
+brotli

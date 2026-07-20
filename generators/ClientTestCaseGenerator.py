@@ -39,7 +39,6 @@ from testCaseGeneratorLib.assertions import normalize_assertion_item, normalize_
 from testCaseGeneratorLib.helpers import (
     decode_id32_to_int,
     id32_no_strip,
-    replace_format2_url_template,
     compute_id64_file_name,
     compute_id64_no_strip,
 )
@@ -609,9 +608,12 @@ writeTest(
 def madeIFTwithInvalidOpCodeInURLTemplate(fontFormat, testName, url_template_bytes):
     """Embed invalid URL template bytes per negative examples in §5.3.3 URL Templates."""
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
-    iftData = nft.getIFTTableData()
-    iftData = replace_format2_url_template(iftData, bytes(url_template_bytes))
-    nft.setIFTTableData(bytes(iftData))
+    patchMap = nft.font["IFT "].table
+    if getattr(patchMap, "Format", None) != 2:
+        raise ValueError("Expected IFT patch map format 2")
+    new_template = bytes(url_template_bytes)
+    patchMap.UrlTemplate = list(new_template)
+    patchMap.UrlTemplateLength = len(new_template)
     nft.writeTestIFTFile()
 
 # https://www.w3.org/TR/IFT/#example-305f10ca example of negative tests

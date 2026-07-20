@@ -31,7 +31,6 @@ from testCaseGeneratorLib.paths import (
     clientTestDirectory,
     clientTestResourcesDirectory,
     fallbackFontPath,
-    buildDirectory
 )
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
@@ -265,10 +264,8 @@ def writeSequenceTest(identifier, title, description, fontFormats, func, sequenc
 
 # start of tests
 def makeIFTWithFormatID(fontFormat, formatId, testName):
-    nft = IFTFile(testName,fontFormat, IFT_FONT_FILENAME)
-    raw = nft.getIFTTableData()
-    raw[IFT_FORMAT_OFFSET] = formatId
-    nft.setIFTTableData(bytes(raw))
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.font["IFT "].table.Format = formatId
     nft.writeTestIFTFile()
 
 testType = "client"
@@ -282,7 +279,7 @@ writeTest(
     description="The IFT table 'format' field for a format 2 is set to 3, which is an invalid format number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink= "#%s" % identifierString,
+    specLink= "#%s" % testTag,
     fontFormats=fontFormats,
     func=makeIFTWithFormatID,
     funcArgs=(3, identifierString)
@@ -290,40 +287,15 @@ writeTest(
 
 def makeIFTWithInvalidDesignSpaceSegmentEndValue(fontFormat, testName):
     # This test is only for format 2. For reference: https://www.w3.org/TR/IFT/#patch-map-format-2
-    nft = IFTFile(testName,fontFormat, IFT_FONT_FILENAME)
-    iftData = nft.getIFTTableData()
-
-    entriesOffset = int.from_bytes(iftData[IFT_ENTRIES_OFFSET_START:IFT_ENTRIES_OFFSET_END], "big")
-    entriesData = iftData[entriesOffset:]
-    offset = 0
-
-    # First Mapping Entry
-    formatFlags = entriesData[offset]
-    offset += 1
-
-    hasFeature = formatFlags & 0b00000001
-    if hasFeature:
-        # featureCount + featureTags
-        featureCount = entriesData[offset]
-        offset += 1
-        offset += featureCount * 4  # skip featureTags
-
-        # designSpaceCount
-        designSpaceCount = int.from_bytes(entriesData[offset:offset+2], "big")
-        offset += 2
-
-        if designSpaceCount > 0:
-            # first Design Space Segment
-            segmentOffset = offset
-            # skip tag (4) + start (4)
-            endOffset = segmentOffset + 8
-
-            # set end to invalid value
-            invalidEndFixed = int(-1 * (1 << 16))  # negative 16.16 fixed
-            entriesData[endOffset:endOffset+4] = struct.pack(">i", invalidEndFixed)
-    iftData = bytearray(iftData[:entriesOffset]) + entriesData
-    nft.setIFTTableData(bytes(iftData))
-    # Write back
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    for entry in nft.font["IFT "].table.MappingEntries.entries:
+        segments = entry.get("designSpaceSegments") or []
+        if segments:
+            # Invalid negative Fixed 16.16 end value (-1.0)
+            segments[0]["end"] = -1.0
+            break
+    else:
+        raise ValueError("No design space segments found in IFT mapping entries")
     nft.writeTestIFTFile()
 
 testTag = "conform-design-space-segment-end-valid-value"
@@ -335,7 +307,7 @@ writeTest(
     description="The IFT table design space segment end value is set to an invalid negative number.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink= "#%s" % identifierString,
+    specLink= "#%s" % testTag,
     fontFormats=fontFormats,
     func=makeIFTWithInvalidDesignSpaceSegmentEndValue,
     funcArgs=(identifierString,)
@@ -667,6 +639,15 @@ def madeIFTWithCustomURLTemplate(fontFormat, testName):
         sourceRelativeDir=os.path.join("URL_TEMPLATE", "IFT"),
     )
     nft.writeTestIFTFile()
+    # nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    # patchMap = nft.font["IFT "].table
+    # if getattr(patchMap, "Format", None) != 2:
+    #     raise ValueError("Expected IFT patch map format 2")
+    # # \x08patches/\x80 is the URL template prefix for the custom URL template
+    # new_template = bytes([8, *map(ord, "patches/"), 128])
+    # patchMap.UrlTemplate = list(new_template)
+    # patchMap.UrlTemplateLength = len(new_template)
+    # nft.writeTestIFTFile()
 
 testTag = "url-template-prefix"
 identifierString= "%s-%s" % (testType, testTag)
@@ -704,10 +685,11 @@ def makeIFTWithId64OpcodeRenamedPatches(fontFormat, testName):
     end-to-end.
     """
     nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
-    raw = nft.getIFTTableData()
+    patchMap = nft.font["IFT "].table
     # Change opcode from 0x80 (Insert id32) to 0x85 (Insert id64)
-    raw[IFT_URL_TEMPLATE_OFFSET] = 0x85
-    nft.setIFTTableData(bytes(raw))
+    url_template = list(patchMap.UrlTemplate)
+    url_template[0] = 0x85
+    patchMap.UrlTemplate = url_template
 
     # Rename *.ift_tk files from id32 names to id64 names (with '=' padding)
     dest_dir = os.path.join(nft.testDirectory, fontFormat)
@@ -735,9 +717,12 @@ writeTest(
                 "'AQ==.ift_tk', allowing the IFT font to load successfully.",
     shouldShowIFT=True,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink="#%s" % identifierString,
+    specLink="#%s" % testTag,
     fontFormats=fontFormats,
     func=makeIFTWithId64OpcodeRenamedPatches,
+    assertions=[
+        {"assert": "patches_loaded", "value": ["Aw==.ift_tk"], "scope": "cumulative"},
+    ],
     funcArgs=(identifierString,)
 )
 

@@ -26,10 +26,17 @@ function attributePatchEntry(entry) {
   if (!(entry.decodedBodySize > 0 || entry.transferSize > 0)) return null;
   const match = entry.name.match(/\/([^/]+)\/(GLYF|CFF)\/([^/?#]+\.(?:ift_tk|ift_gk))(?:[?#]|$)/);
   if (!match) return null;
+  // Performance Resource Timing keeps request encoding (e.g. Aw%3D%3D.ift_tk);
+  let basename = match[3];
+  try {
+    basename = decodeURIComponent(basename);
+  } catch (_) {
+    // Keep the raw basename if it is not valid percent-encoding.
+  }
   return {
     testId: match[1],
     format: match[2],
-    basename: match[3],
+    basename,
     entry,
   };
 }

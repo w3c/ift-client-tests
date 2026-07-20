@@ -639,15 +639,6 @@ def madeIFTWithCustomURLTemplate(fontFormat, testName):
         sourceRelativeDir=os.path.join("URL_TEMPLATE", "IFT"),
     )
     nft.writeTestIFTFile()
-    # nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
-    # patchMap = nft.font["IFT "].table
-    # if getattr(patchMap, "Format", None) != 2:
-    #     raise ValueError("Expected IFT patch map format 2")
-    # # \x08patches/\x80 is the URL template prefix for the custom URL template
-    # new_template = bytes([8, *map(ord, "patches/"), 128])
-    # patchMap.UrlTemplate = list(new_template)
-    # patchMap.UrlTemplateLength = len(new_template)
-    # nft.writeTestIFTFile()
 
 testTag = "url-template-prefix"
 identifierString= "%s-%s" % (testType, testTag)
@@ -661,6 +652,9 @@ writeTest(
     specLink="#url-templates",
     fontFormats=fontFormats,
     func=madeIFTWithCustomURLTemplate,
+    assertions=[
+        {"assert": "patches_loaded", "value": [r"/^patches\/.*\.ift_tk$/"]},
+    ],
     funcArgs=(identifierString,)
 )
 
@@ -721,7 +715,7 @@ writeTest(
     fontFormats=fontFormats,
     func=makeIFTWithId64OpcodeRenamedPatches,
     assertions=[
-        {"assert": "patches_loaded", "value": ["Aw==.ift_tk"], "scope": "cumulative"},
+        {"assert": "patches_loaded", "value": ["Aw==.ift_tk"]},
     ],
     funcArgs=(identifierString,)
 )

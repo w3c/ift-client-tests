@@ -43,19 +43,58 @@ function resolveAssertValue(item) {
   return value;
 }
 
+/** Parse /pattern/flags into a RegExp, or null if not a regex value. */
+function parsePatchRegex(value) {
+  if (typeof value !== 'string' || value.length < 2 || value[0] !== '/') {
+    return null;
+  }
+  const lastSlash = value.lastIndexOf('/');
+  if (lastSlash <= 0) return null;
+  const pattern = value.slice(1, lastSlash);
+  const flags = value.slice(lastSlash + 1);
+  if (!/^[ims]*$/.test(flags)) return null;
+  try {
+    return new RegExp(pattern, flags);
+  } catch (_) {
+    return null;
+  }
+}
+
+function patchNameMatches(loadedNames, expected) {
+  const re = parsePatchRegex(expected);
+  if (re) {
+    for (const name of loadedNames) {
+      if (re.test(name)) return true;
+    }
+    return false;
+  }
+  return loadedNames.has(expected);
+}
+
+function patchNameAbsent(loadedNames, expected) {
+  const re = parsePatchRegex(expected);
+  if (re) {
+    for (const name of loadedNames) {
+      if (re.test(name)) return false;
+    }
+    return true;
+  }
+  return !loadedNames.has(expected);
+}
+
 function patchesMatchAllow(loadedBasenames, value) {
   if (value === undefined) return false;
   if (value === true) return loadedBasenames.size > 0;
   if (value === false) return loadedBasenames.size === 0;
   if (!Array.isArray(value) || value.length === 0) return false;
-  return value.every((name) => loadedBasenames.has(name));
+  return value.every((name) => patchNameMatches(loadedBasenames, name));
 }
 
 function patchesMatchDeny(loadedBasenames, value) {
   if (value === undefined) return false;
   if (value === true) return loadedBasenames.size === 0;
   if (!Array.isArray(value) || value.length === 0) return true;
-  return value.every((name) => !loadedBasenames.has(name));
+  return value.every((name) => patchNameAbsent(loadedBasenames, name));
 }
 
 function scopedPatches(ctx, item) {

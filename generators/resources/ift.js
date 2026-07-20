@@ -24,7 +24,10 @@ function isPatchUrl(url) {
 function attributePatchEntry(entry) {
   if (!isPatchUrl(entry.name)) return null;
   if (!(entry.decodedBodySize > 0 || entry.transferSize > 0)) return null;
-  const match = entry.name.match(/\/([^/]+)\/(GLYF|CFF)\/([^/?#]+\.(?:ift_tk|ift_gk))(?:[?#]|$)/);
+  // Allow optional subdirs under the format dir (e.g. patches/0C.ift_tk).
+  const match = entry.name.match(
+    /\/([^/]+)\/(GLYF|CFF)\/((?:[^/?#]+\/)*[^/?#]+\.(?:ift_tk|ift_gk))(?:[?#]|$)/
+  );
   if (!match) return null;
   // Performance Resource Timing keeps request encoding (e.g. Aw%3D%3D.ift_tk);
   let basename = match[3];

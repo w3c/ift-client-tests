@@ -8,11 +8,13 @@ value/scope are always top-level; config holds type-specific extras only.
 """
 
 import json
+import re
 import html as html_module
 
 BUILTIN_ASSERTIONS = {}
 
 PATCH_ASSERT_TYPES = frozenset({"patches_loaded", "patches_not_loaded"})
+_PATCH_REGEX_VALUE = re.compile(r"^/(.+)/([a-z]*)$", re.DOTALL)
 
 
 def serialize_assert_span(type_id, test_id, font_format, value, scope=None, config=None):
@@ -59,13 +61,52 @@ class AssertionSpec(object):
         return self.type_id
 
 
+def _validate_patch_regex_value(name, param_name):
+    """Validate a /pattern/flags patch assertion value and that the pattern compiles."""
+    match = _PATCH_REGEX_VALUE.match(name)
+    if not match:
+        raise AssertionError(
+            "%s: regex patch value must look like /pattern/flags, got %r"
+            % (param_name, name)
+        )
+    pattern, flags = match.group(1), match.group(2)
+    re_flags = 0
+    for ch in flags:
+        if ch == "i":
+            re_flags |= re.IGNORECASE
+        elif ch == "m":
+            re_flags |= re.MULTILINE
+        elif ch == "s":
+            re_flags |= re.DOTALL
+        else:
+            raise AssertionError(
+                "%s: unsupported regex flag %r in %r (allowed: i, m, s)"
+                % (param_name, ch, name)
+            )
+    try:
+        re.compile(pattern, re_flags)
+    except re.error as exc:
+        raise AssertionError(
+            "%s: invalid regex %r: %s" % (param_name, name, exc)
+        )
+
+
 def _validate_patch_names(names, param_name):
     if not isinstance(names, (list, tuple)):
         raise TypeError("%s list value must be a list of patch filenames" % param_name)
     for name in names:
-        if not isinstance(name, str) or not name.endswith((".ift_tk", ".ift_gk")):
+        if not isinstance(name, str):
             raise AssertionError(
-                "%s: patch name must end with .ift_tk or .ift_gk, got %r"
+                "%s: patch name must be a string, got %r" % (param_name, name)
+            )
+        # Literals never start with '/'; regex values use /pattern/flags.
+        if name.startswith("/"):
+            _validate_patch_regex_value(name, param_name)
+            continue
+        if not name.endswith((".ift_tk", ".ift_gk")):
+            raise AssertionError(
+                "%s: patch name must end with .ift_tk or .ift_gk "
+                "(or be a /pattern/flags regex), got %r"
                 % (param_name, name)
             )
 

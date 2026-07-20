@@ -1405,11 +1405,7 @@ writeSequenceTest(
         # push 'Q' into the client
         {"action": "render", "text": "Q"},
         # Expect no patches to be loaded
-        {"assert": "patches_loaded", "value": False, "scope": "delta"},
-        # Expect no patches to be loaded
         {"assert": "patches_not_loaded", "value": True, "scope": "delta"},
-        # Expect some patches to be loaded
-        {"assert": "patches_loaded", "value": True, "scope": "cumulative"},
         # Expect the patches to be the same as the ones in the _PATCH_CUMULATIVE dictionary
         {"assert": "patches_loaded", "value": _PATCH_CUMULATIVE, "scope": "cumulative"},
     ],

@@ -14,7 +14,7 @@ import html as html_module
 BUILTIN_ASSERTIONS = {}
 
 PATCH_ASSERT_TYPES = frozenset({"patches_loaded", "patches_not_loaded"})
-_PATCH_REGEX_VALUE = re.compile(r"^/(.+)/([a-z]*)$", re.DOTALL)
+PATCH_REGEX_VALUE = re.compile(r"^/(.+)/([a-z]*)$", re.DOTALL)
 
 
 def serialize_assert_span(type_id, test_id, font_format, value, scope=None, config=None):
@@ -63,7 +63,7 @@ class AssertionSpec(object):
 
 def _validate_patch_regex_value(name, param_name):
     """Validate a /pattern/flags patch assertion value and that the pattern compiles."""
-    match = _PATCH_REGEX_VALUE.match(name)
+    match = PATCH_REGEX_VALUE.match(name)
     if not match:
         raise AssertionError(
             "%s: regex patch value must look like /pattern/flags, got %r"

@@ -74,12 +74,21 @@ def makeStopExtendFont(sourceFontPath):
 
     font = TTFont(subsetFont)
 
-    # Add the decoy codepoint -> decoy glyph mapping. The source font already
-    # maps DECOY_GLYPH_NAME from its normal codepoint (e.g. 0x42 for "B");
-    # that mapping is left in place (harmless, never typed in test HTML) and
-    # U+E000 is added alongside it in every cmap subtable.
+    # Map U+E000 to the decoy glyph, and -- critically -- strip out the
+    # source font's *original* codepoint for that glyph (e.g. 0x42 for "B")
+    # in every cmap subtable. Leaving both mappings in place made the
+    # closure-based segmenter treat this as a "shared component" case (two
+    # distinct segments both reaching the same glyph), which it resolved as
+    # a *conjunctive* activation condition (both codepoints required, not
+    # either) -- since this test's HTML never contains a literal "B", that
+    # condition could never be satisfied and the decoy patch was never
+    # requested at all. With only U+E000 able to reach the glyph, it's an
+    # ordinary single-segment/exclusive-patch condition, same shape as the
+    # existing PASS/FAIL segment.
     cmapTable = font["cmap"]
     for subtable in cmapTable.tables:
+        for codepoint in [cp for cp, name in subtable.cmap.items() if name == DECOY_GLYPH_NAME]:
+            del subtable.cmap[codepoint]
         subtable.cmap[DECOY_CODEPOINT] = DECOY_GLYPH_NAME
 
     new_name = "RobotoFallbackIftStopextend"

@@ -1573,10 +1573,19 @@ DECOY_CODEPOINT = 0xE000
 def makeIFTWithDecoyPatchNonLoadError(fontFormat, testName):
     """
     Use the STOP_EXTEND build (base PASS/FAIL font plus one extra,
-    independent glyph-keyed patch for the decoy codepoint) and corrupt only
-    the decoy's patch file, identified by having the fewest glyphs of any
-    _gk patch in this build (it should contain exactly the one decoy glyph,
+    independent glyph-keyed patch for the decoy codepoint) and corrupt every
+    decoy patch file, identified by having the fewest glyphs of any _gk
+    patch in this build (it should contain exactly the one decoy glyph,
     versus several for the PASS/FAIL group).
+
+    Each patch "slot" in the segmentation plan is compiled into more than
+    one physical _gk file (e.g. "04.1"/"04.2") -- alternate versions of the
+    same patch for different possible client states (jump_ahead/prefetch).
+    Corrupting only one of them left a valid fallback copy in place, so the
+    client could satisfy the decoy requirement from the untouched copy and
+    the test never actually exercised the error path. All physical files
+    for the decoy slot must be corrupted, while every PASS/FAIL file is left
+    completely valid.
     """
     import brotli
 
@@ -1606,15 +1615,18 @@ def makeIFTWithDecoyPatchNonLoadError(fontFormat, testName):
             "been generated (see Makefile)?" % destDir
         )
 
-    # The decoy patch should be the smallest (exactly 1 glyph); the
-    # PASS/FAIL patch groups several letters together.
-    decoyFile = min(counts, key=counts.get)
+    # Every physical file for the decoy slot has the fewest glyphs (1); the
+    # PASS/FAIL slot's files group several letters together. Corrupt all of
+    # the former, none of the latter.
+    minCount = min(counts.values())
+    decoyFiles = [gkFile for gkFile, count in counts.items() if count == minCount]
 
-    with open(decoyFile, "rb") as f:
-        data = bytearray(f.read())
-    data[0:4] = b"XXXX"
-    with open(decoyFile, "wb") as f:
-        f.write(data)
+    for decoyFile in decoyFiles:
+        with open(decoyFile, "rb") as f:
+            data = bytearray(f.read())
+        data[0:4] = b"XXXX"
+        with open(decoyFile, "wb") as f:
+            f.write(data)
 
 
 def _makeDecoyCodepointSpan():

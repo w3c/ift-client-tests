@@ -143,7 +143,7 @@ registeredIdentifiers = set()
 registeredTitles = set()
 registeredDescriptions = set()
 
-def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False):
+def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, specLink=None, credits=[], shouldShowIFT=False, extraHTML=None):
     """
     This function generates all of the files needed by a test case and
     registers the case with the suite. The arguments:
@@ -196,6 +196,7 @@ def writeTest(identifier, title, description, fontFormats, func, funcArgs=None, 
             shouldShowIFT=shouldShowIFT,
             specLink=specLink,
             fontFormats=fontFormats,
+            extraHTML=extraHTML,
         )
     )
 
@@ -1533,6 +1534,122 @@ writeTest(
     fontFormats=fontFormats,
     func=makeIFTWithValidGlyphKeyedPatch,
     funcArgs=(identifierString,)
+)
+
+
+# --------------------------------------------------------------------------
+# conform-stop-extend-after-errors (issue #22)
+#
+# "In the case of all other errors the client must not attempt to further
+# extend the font subset."
+#
+# Every other test in this suite only ever needs a single glyph-keyed patch
+# to satisfy its target text (the base -ift subset already contains
+# everything except the PASS/FAIL letters, all of which live in one patch),
+# so there's never a second patch left over to *not* apply. This test uses
+# a separate font build (build/STOP_EXTEND, see
+# generators/makeStopExtendDecoyFont.py and the Makefile) that adds one
+# extra, independent glyph/codepoint (U+E000) with its own dedicated
+# glyph-keyed patch alongside the usual PASS/FAIL patch.
+#
+# The decoy codepoint is placed off-screen in the test's HTML (absolute
+# positioning, not display:none/visibility:hidden -- innerText omits text
+# from elements that aren't rendered at all) so it's picked up by
+# resources/ift.js's codepoint computation and requested for extension
+# along with the visible PASS/FAIL text, without ever being seen.
+#
+# Only the decoy's patch file is corrupted (bad format tag -> a non-load
+# error, same defect as conform-glyph-keyed-format-equals-ifgk). The
+# PASS/FAIL patch is left completely valid. A conforming client must not
+# apply that valid patch once the decoy patch has failed with this error,
+# so the IFT font never renders and the fallback (FAIL) shows. A client
+# that incorrectly keeps extending after the error would still apply the
+# valid patch and incorrectly show PASS.
+# --------------------------------------------------------------------------
+
+DECOY_CODEPOINT = 0xE000
+
+
+def makeIFTWithDecoyPatchNonLoadError(fontFormat, testName):
+    """
+    Use the STOP_EXTEND build (base PASS/FAIL font plus one extra,
+    independent glyph-keyed patch for the decoy codepoint) and corrupt only
+    the decoy's patch file, identified by having the fewest glyphs of any
+    _gk patch in this build (it should contain exactly the one decoy glyph,
+    versus several for the PASS/FAIL group).
+    """
+    import brotli
+
+    destDir = os.path.join(clientTestDirectory, testName, fontFormat)
+    if not os.path.exists(destDir):
+        shutil.copytree(
+            os.path.join(buildDirectory, "STOP_EXTEND", "IFT", fontFormat),
+            destDir,
+        )
+
+    builtFontPath = os.path.join(destDir, "font.ift.woff2")
+    if os.path.exists(builtFontPath):
+        os.rename(builtFontPath, os.path.join(destDir, IFT_FONT_FILENAME))
+
+    gkFiles = glob.glob(os.path.join(destDir, "*_gk"))
+    counts = {}
+    for gkFile in gkFiles:
+        with open(gkFile, "rb") as f:
+            data = f.read()
+        decompressed = brotli.decompress(bytes(data[29:]))
+        glyphCount = struct.unpack(">I", decompressed[0:4])[0]
+        counts[gkFile] = glyphCount
+
+    if not counts:
+        raise ValueError(
+            "No _gk patch files found in %s -- has the STOP_EXTEND build "
+            "been generated (see Makefile)?" % destDir
+        )
+
+    # The decoy patch should be the smallest (exactly 1 glyph); the
+    # PASS/FAIL patch groups several letters together.
+    decoyFile = min(counts, key=counts.get)
+
+    with open(decoyFile, "rb") as f:
+        data = bytearray(f.read())
+    data[0:4] = b"XXXX"
+    with open(decoyFile, "wb") as f:
+        f.write(data)
+
+
+def _makeDecoyCodepointSpan():
+    """
+    An off-screen (not display:none/visibility:hidden, since those are
+    excluded from element.innerText) span containing the decoy codepoint, so
+    it's requested for extension alongside the visible PASS/FAIL text but
+    never actually seen.
+    """
+    return (
+        "\t\t\t\t\t<p style=\"position:absolute;left:-9999px;\" aria-hidden=\"true\">"
+        "&#x%X;</p>"
+    ) % DECOY_CODEPOINT
+
+
+testTag = "conform-stop-extend-after-errors"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Client must not continue extending after a non-load error",
+    description="The font requires two independent glyph-keyed patches to satisfy the "
+                "requested text: one for the visible PASS/FAIL letters, and one for an "
+                "off-screen decoy codepoint. Only the decoy's patch is corrupted (invalid "
+                "format tag), while the PASS/FAIL patch is left completely valid. A "
+                "conforming client must not attempt to further extend the font subset once "
+                "the decoy patch fails with this error, so the IFT font must not render "
+                "even though the PASS/FAIL patch itself was valid.",
+    shouldShowIFT=False,
+    credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithDecoyPatchNonLoadError,
+    funcArgs=(identifierString,),
+    extraHTML=_makeDecoyCodepointSpan(),
 )
 
 

@@ -1619,6 +1619,14 @@ def makeIFTWithDecoyPatchNonLoadError(fontFormat, testName):
     # PASS/FAIL slot's files group several letters together. Corrupt all of
     # the former, none of the latter.
     minCount = min(counts.values())
+    assert minCount == 1, (
+        "Expected the decoy patch to contain exactly 1 glyph, but the "
+        "smallest _gk patch in %s has %d. If a future encoder/segmentation "
+        "change merged the decoy glyph into the PASS/FAIL patch (or grouped "
+        "it some other way), this test would silently become a no-op -- fix "
+        "the font/plan generation (see makeStopExtendDecoyFont.py) rather "
+        "than loosening this assertion." % (destDir, minCount)
+    )
     decoyFiles = [gkFile for gkFile, count in counts.items() if count == minCount]
 
     for decoyFile in decoyFiles:
@@ -1627,6 +1635,25 @@ def makeIFTWithDecoyPatchNonLoadError(fontFormat, testName):
         data[0:4] = b"XXXX"
         with open(decoyFile, "wb") as f:
             f.write(data)
+
+    # At least one _gk patch (the PASS/FAIL group) must remain valid and
+    # untouched. Without this, there's nothing left to distinguish "the
+    # client stopped extending after an error" from "nothing was ever going
+    # to render regardless" -- the test would still show FAIL, but for the
+    # wrong reason.
+    validFiles = [gkFile for gkFile in gkFiles if gkFile not in decoyFiles]
+    assert validFiles, (
+        "No valid (uncorrupted) _gk patch file remains in %s after "
+        "corrupting the decoy patch(es) -- this test needs a still-valid "
+        "PASS/FAIL patch to prove the client refuses to apply it." % destDir
+    )
+    for validFile in validFiles:
+        with open(validFile, "rb") as f:
+            tag = f.read(4)
+        assert tag == b"ifgk", (
+            "%s was expected to remain a valid, untouched glyph-keyed patch "
+            "(tag 'ifgk') but has tag %r." % (validFile, tag)
+        )
 
 
 def _makeDecoyCodepointSpan():

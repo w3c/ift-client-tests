@@ -14,6 +14,7 @@ tests: IFTClient/Tests/xhtml1/index.html
 IFTClient/Tests/xhtml1/index.html: \
 	build/IFT/GLYF/font.ift.woff2 build/IFT/CFF/font.ift.woff2 \
 	build/URL_TEMPLATE/IFT/GLYF/font.ift.woff2 build/URL_TEMPLATE/IFT/CFF/font.ift.woff2 \
+	build/STOP_EXTEND/IFT/GLYF/font.ift.woff2 build/STOP_EXTEND/IFT/CFF/font.ift.woff2 \
 	build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf
 	cd generators/; python3 ./ClientTestCaseGenerator.py
 
@@ -77,6 +78,53 @@ build/URL_TEMPLATE/IFT/CFF/font.ift.woff2: build/config/cff_segmentation_plan.tx
 		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift.otf \
 		--plan=$(CURDIR)/build/URL_TEMPLATE/IFT/CFF/cff_segmentation_plan.txtpb \
 		--output_path=$(CURDIR)/build/URL_TEMPLATE/IFT/CFF \
+		--output_font="font.ift.woff2"
+
+# --------------------------------------------------------------------------
+# Decoy-glyph variant used by conform-stop-extend-after-errors (issue #22).
+# Adds one extra glyph/codepoint (U+E000) to the standard -ift subsetted
+# fonts, in its own build tree, so extending the font requires two
+# independent glyph-keyed patches instead of one. See
+# generators/makeStopExtendDecoyFont.py for details.
+# --------------------------------------------------------------------------
+
+build/subsettedFonts/cff-ift-stopextend.otf build/subsettedFonts/glyf-ift-stopextend.ttf &: \
+	build/subsettedFonts/cff-ift.otf build/subsettedFonts/glyf-ift.ttf \
+	generators/makeStopExtendDecoyFont.py
+	cd generators/; python3 ./makeStopExtendDecoyFont.py
+
+build/config/glyf_stopextend_segmentation_plan.txtpb: build/subsettedFonts/glyf-ift-stopextend.ttf encoder/config/segmentation_config.txtpb
+	mkdir -p build/config/
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
+	      --input_font=$(CURDIR)/build/subsettedFonts/glyf-ift-stopextend.ttf \
+	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
+	      --nooutput_segmentation_analysis \
+	      --include_initial_codepoints_in_config \
+	      --output_segmentation_plan > $(CURDIR)/build/config/glyf_stopextend_segmentation_plan.txtpb
+
+build/config/cff_stopextend_segmentation_plan.txtpb: build/subsettedFonts/cff-ift-stopextend.otf encoder/config/segmentation_config.txtpb
+	mkdir -p build/config/
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:gen_ift_segmentation_plan -- \
+	      --input_font=$(CURDIR)/build/subsettedFonts/cff-ift-stopextend.otf \
+	      --config=$(CURDIR)/encoder/config/segmentation_config.txtpb \
+	      --nooutput_segmentation_analysis \
+	      --include_initial_codepoints_in_config \
+	      --output_segmentation_plan > $(CURDIR)/build/config/cff_stopextend_segmentation_plan.txtpb
+
+build/STOP_EXTEND/IFT/GLYF/font.ift.woff2: build/config/glyf_stopextend_segmentation_plan.txtpb build/subsettedFonts/glyf-ift-stopextend.ttf
+	mkdir -p build/STOP_EXTEND/IFT/GLYF
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/subsettedFonts/glyf-ift-stopextend.ttf \
+		--plan=$(CURDIR)/build/config/glyf_stopextend_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/STOP_EXTEND/IFT/GLYF \
+		--output_font="font.ift.woff2"
+
+build/STOP_EXTEND/IFT/CFF/font.ift.woff2: build/config/cff_stopextend_segmentation_plan.txtpb build/subsettedFonts/cff-ift-stopextend.otf
+	mkdir -p build/STOP_EXTEND/IFT/CFF
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift-stopextend.otf \
+		--plan=$(CURDIR)/build/config/cff_stopextend_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/STOP_EXTEND/IFT/CFF \
 		--output_font="font.ift.woff2"
 
 clean:

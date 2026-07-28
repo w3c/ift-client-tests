@@ -1272,25 +1272,58 @@ writeTest(
     funcArgs=(identifierString,)
 )
 
-def _makeDifferentDocumentScript(identifierString):
+def makeIFTForDocumentIsolationTest(fontFormat, testName):
     """
-    Builds the extra markup/script for conform-web-font-not-accessible-from-different-document.
+    Build a test from a valid, unmodified glyph-keyed patch -- identical to
+    makeIFTWithValidGlyphKeyedPatch's positive control -- so the standard
+    per-format harness (resources/ift.js) reconstructs a genuine IFT font
+    from real patches in *this* (parent) document, exactly like every other
+    test in the suite. This is the "specific IFT loaded in the parent
+    window" that conform-web-font-not-accessible-from-different-document
+    then checks does not leak into a sibling iframe.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.writeTestIFTFile()
+
+
+def _makeDifferentDocumentIframe(identifierString, fontFormat):
+    """
+    Builds the extra markup for conform-web-font-not-accessible-from-different-document.
 
     Per https://www.w3.org/TR/IFT/#per-origin (quoting CSS Fonts 4):
     "A Web Font must not be accessible in any other Document from the one
     which either is associated with the @font-face rule or owns the
     FontFaceSet."
 
-    This works exactly like every other test in this suite -- a single
-    "Should [Not] Render IFT: P/F" indicator, styled with the loaded font
-    plus a fallback -- except the indicator element lives inside an iframe
-    (a distinct Document) instead of directly on the page. The font is
-    loaded via the FontFace API and added only to the *parent* document's
-    `document.fonts`, exactly as an IFT client does when it reconstructs a
-    font from patches. Since the iframe's own (separate, empty) FontFaceSet
-    never receives it, and the iframe has no @font-face for it either, a
-    conforming client must fall back there, so the indicator reads "F"
-    ("Should Not Render IFT").
+    Unlike the first version of this test (see PR review on #27), nothing
+    custom is fetched/loaded here. `func` above builds an ordinary, valid,
+    unmodified patch, so the *standard* per-format harness in
+    resources/ift.js reconstructs a real IFT font from real patches and adds
+    it to this (parent) document's FontFaceSet, under the same name it
+    always uses: "<fontFormat>-<identifier>-IFT-Font". That row's own
+    "Should Render IFT: P (<fontFormat>)" indicator is left in place as a
+    sanity check that the setup genuinely works in the parent.
+
+    This markup adds a sibling iframe (a distinct Document). The iframe
+    never loads resources/ift.js and never receives this FontFace itself,
+    so its own indicator span, styled with that *exact same* family name
+    plus the suite's usual "RobotoFallback" fallback, should only ever be
+    able to render via the fallback if isolation is correctly enforced.
+
+    The critical fix from the first version: the reconstructed IFT font
+    uses the "ift" mode ligature (F -> FAIL), while the site-wide
+    RobotoFallback fallback uses the inverted "fallback" mode ligature
+    (F -> PASS) -- see makeSubsettedFont.py. Those are deliberately
+    different fonts, so the two outcomes are visually distinguishable:
+      - Isolated (conforming): the family name resolves to nothing in the
+        iframe's own (empty) FontFaceSet -> falls back to RobotoFallback ->
+        renders PASS.
+      - Leaked (non-conforming): the family name resolves to the parent's
+        reconstructed font inside the iframe too -> renders FAIL.
+    The first version of this test used the *same* fallback file as both
+    the "loaded" font and the iframe's own fallback, so isolated and leaked
+    were visually identical (both PASS) and the test could never actually
+    fail regardless of browser behavior.
 
     The iframe's font-family is baked directly into its `srcdoc` HTML
     (rather than being set later via script once the iframe "loads") so
@@ -1301,26 +1334,13 @@ def _makeDifferentDocumentScript(identifierString):
     while the real "load" event for the actual content may already have
     fired before a listener gets attached -- either way, the intended style
     never reaches the real element. Setting it inline from the start avoids
-    that race entirely: the fallback applies from the very first paint.
-
-    No new font files are generated for this test (there's no `IFTFile` call
-    anywhere here). The fallback shown when FAMILY fails to resolve is the
-    same "RobotoFallback" font (same underlying resources/fallback/Roboto.ttf
-    bytes) used by every other test's fallback, matching their appearance --
-    not the generic `monospace` keyword. Since @font-face rules don't cross
-    Documents either, the iframe declares its own @font-face for
-    'RobotoFallback' pointing at that same shared file (relative URLs in
-    srcdoc content resolve against the parent document's URL, so the same
-    "resources/fallback/Roboto.ttf" path used for the parent's fetch() below
-    also works from inside the iframe).
+    that race entirely.
     """
+    family = "%s-%s-IFT-Font" % (fontFormat, identifierString)
     frameId = "diffdoc-frame-%s" % identifierString
-    family = "IFT-DocIsolationTestFont-%s" % identifierString
-    # Shared resource copied once for the whole suite, relative to testcaseindex.xht.
-    fontURL = "resources/fallback/Roboto.ttf"
     frameSrcdoc = (
         "&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;style&gt;"
-        "@font-face{font-family:'RobotoFallback';src:url(%s) format('truetype');}"
+        "@font-face{font-family:'RobotoFallback';src:url(resources/fallback/Roboto.ttf) format('truetype');}"
         "html,body{height:100%%;margin:0;}"
         "body{display:flex;align-items:center;justify-content:center;}"
         "&lt;/style&gt;&lt;/head&gt;"
@@ -1328,63 +1348,41 @@ def _makeDifferentDocumentScript(identifierString):
         "&lt;span id=&quot;result&quot; class=&quot;result&quot; "
         "style=&quot;font-family:%s, RobotoFallback; font-size:15px&quot;&gt;F&lt;/span&gt;"
         "&lt;/body&gt;&lt;/html&gt;"
-    ) % (fontURL, family)
+    ) % family
     return """
-					<p>Should Not Render IFT (font added to the parent document, not this iframe's):
+					<p>Should Not Render IFT in the iframe (the font above is only added to the parent document's FontFaceSet):
 					<iframe id="%(frameId)s" style="width:40px;height:44px;border:0;vertical-align:middle;"
 							srcdoc="%(frameSrcdoc)s"></iframe></p>
-					<script>
-					(function () {
-						var FAMILY = %(family)r;
-						var FONT_URL = %(fontURL)r;
-
-						// Load the font via the FontFace API and add it only to this (parent)
-						// document's font set -- never to the iframe's. The iframe's own
-						// font-family value is already baked into its srcdoc above, so it can
-						// never resolve to FAMILY there regardless of when (or whether) this
-						// load finishes -- it must render with the RobotoFallback fallback.
-						fetch(FONT_URL)
-							.then(function (r) { return r.arrayBuffer(); })
-							.then(function (buf) {
-								var face = new FontFace(FAMILY, buf);
-								return face.load();
-							})
-							.then(function (face) {
-								document.fonts.add(face);
-							});
-					})();
-					</script>
 """.strip("\n") % dict(
         frameId=frameId,
-        family=family,
-        fontURL=fontURL,
         frameSrcdoc=frameSrcdoc,
     )
 
 
 testTag = "conform-web-font-not-accessible-from-different-document"
 identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF"]
 writeTest(
     identifier=identifierString,
     title="Web font must not be accessible from a different Document",
     description="Per CSS Fonts 4, a Web Font (including one loaded incrementally via "
-                "the FontFace API and added to document.fonts) must not be accessible "
-                "in any Document other than the one whose FontFaceSet it was added to. "
-                "This test adds a font to the top-level document's font set, then checks "
-                "the same 'Should Render IFT' P/F indicator used elsewhere in this suite "
-                "-- except the indicator lives inside a sibling iframe (a distinct "
-                "Document) that never received the font, so it must read 'F'.",
+                "the FontFace API and added to document.fonts, as an IFT client does "
+                "when it reconstructs a font from patches) must not be accessible in "
+                "any Document other than the one whose FontFaceSet it was added to. "
+                "This test extends a genuine IFT font from real patches in the "
+                "top-level document -- the same mechanism every other test in this "
+                "suite uses, and the same 'Should Render IFT: P' row confirms it -- "
+                "then checks a second 'Should Render IFT' indicator inside a sibling "
+                "iframe (a distinct Document) that never receives the font, so it "
+                "must read 'F' (falling back, rather than resolving the family name "
+                "to the parent's font).",
+    shouldShowIFT=True,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
     specLink="#%s" % identifierString,
-    # No fontFormats: this test isn't about the IFT patch-extension pipeline
-    # (there's no separate "Should Render IFT: P/F" row generated by the
-    # generic per-format harness here), it's a generic CSS Fonts / FontFace-
-    # API document-scoping check, so `func` is never invoked and no
-    # per-format font artifacts are generated. The equivalent P/F indicator
-    # is built directly into extraHTML below, inside the iframe.
-    fontFormats=[],
-    func=lambda *args, **kwargs: None,
-    extraHTML=_makeDifferentDocumentScript(identifierString),
+    fontFormats=fontFormats,
+    func=makeIFTForDocumentIsolationTest,
+    funcArgs=(identifierString,),
+    extraHTML=_makeDifferentDocumentIframe(identifierString, fontFormats[0]),
 )
 
 

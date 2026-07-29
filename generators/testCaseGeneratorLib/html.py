@@ -158,7 +158,11 @@ def generateClientIndexHTML(directory=None, testCases=[], note=None):
                 string = "%s: <span id=\"%s\" data-format=\"%s\" class=\"result\">%s</span> (%s)" % (render_text, format_identifier,fontFormat,shouldShowIFT,fontFormat)
                 html_string.append("\t\t\t\t\t<p>%s</p>" % string)
             # optional custom markup/script for tests that need more than the
-            # standard "does the IFT font render" check.
+            # standard "does the IFT font render" check (e.g. cross-document
+            # assertions that require a second Document/iframe). Placed here,
+            # alongside the format-row(s) above, so the documentation link
+            # below still lands underneath the test content like every other
+            # test case.
             extraHTML = test.get("extraHTML")
             if extraHTML:
                 html_string.append(extraHTML)

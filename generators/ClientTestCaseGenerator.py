@@ -1812,6 +1812,351 @@ writeTest(
 )
 
 
+# --------------------------------------------------------------------------
+# apply-table-keyed algorithm tests (spec §6.2.1 Applying Table Keyed Patches)
+#
+# These five sub-tests cover the important pieces of the Apply table keyed
+# patch algorithm (see issue #9):
+#   - Step 3: reject a patch whose compatibilityId does not match.
+#   - Step 5: reject a patch whose decoded size exceeds maxUncompressedLength.
+#   - Step 5: reject a patch whose shared dictionary table is missing from
+#     the base font.
+#   - Step 5: reject a patch with brotli data not consumed by decoding.
+#   - Step 5: ignore a duplicate-tag entry (positive control).
+#
+# All five share the "apply-table-keyed" algorithm conformance id (the id is an
+# algorithm statement in the spec), differentiated by an "_<name>" suffix so
+# check_coverage.py counts them as separate tests of the same algorithm.
+#
+# Table keyed patch layout (used by the modifying tests):
+#   0-3:   format (Tag) = 'iftk'
+#   4-7:   reserved (uint32)
+#   8-23:  compatibilityId (uint32[4], 16 bytes)
+#   24-25: patchesCount (uint16)
+#   26+:   patches (Offset32[patchesCount+1], from the start of the patch)
+# Each TablePatch pointed to by the offsets:
+#   0-3:   tag (Tag)
+#   4:     flags (uint8)          -- bit 0: replace (no shared dictionary),
+#                                    bit 1: remove table
+#   5-8:   maxUncompressedLength (uint32)
+#   9+:    brotliStream
+#
+# The tests below target the 'head' TablePatch entry, which is present in
+# every table keyed patch produced by the encoder and whose decoded contents
+# are a complete 'head' table -- always exactly 54 bytes -- so the true
+# decoded size is known without brotli shared-dictionary support.
+# --------------------------------------------------------------------------
+
+def readTableKeyedPatchOffsets(data):
+    """Return the patches offsets array (patchesCount+1 entries) of a table
+    keyed patch."""
+    patchesCount = struct.unpack(">H", data[24:26])[0]
+    return [
+        struct.unpack(">I", data[26 + i * 4:30 + i * 4])[0]
+        for i in range(patchesCount + 1)
+    ]
+
+
+def findTableKeyedPatchEntry(data, tag):
+    """Return (index, start, end) of the first TablePatch with the given tag."""
+    offsets = readTableKeyedPatchOffsets(data)
+    for i in range(len(offsets) - 1):
+        if bytes(data[offsets[i]:offsets[i] + 4]) == tag:
+            return i, offsets[i], offsets[i + 1]
+    raise AssertionError("No %r TablePatch entry found" % tag)
+
+
+def makeIFTWithMismatchedTableKeyedCompatId(fontFormat, testName):
+    """
+    Corrupt the compatibilityId field in each table-keyed patch so it no longer
+    matches the compatibility id from the base font's 'IFT '/'IFTX' table.
+
+    Tests apply-table-keyed step 3: 'Check that the compatibilityId field in
+    patch is equal to compatibility id. If there is no match ... patch
+    application has failed, return an error.'
+
+    A conforming client detects the mismatch and rejects the patch, so the IFT
+    font fails to render and the fallback font shows PASS.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkFile in glob.glob(os.path.join(destDir, "*_tk")):
+        with open(tkFile, "rb") as f:
+            data = bytearray(f.read())
+        # Flip the first byte of the 16-byte compatibilityId (bytes 8-23) so it
+        # is guaranteed to differ from the compatibility id declared in the base
+        # font's IFT table. This is the only defect introduced.
+        data[8] ^= 0xFF
+        with open(tkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-table-keyed_reject-mismatched-compatibility-id"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch with mismatched compatibility id",
+    description="The compatibilityId field of each table-keyed patch is altered so "
+                "it no longer matches the compatibility id in the base font's IFT "
+                "table. A conforming client must reject the patch (Apply table keyed "
+                "patch, step 3), so the IFT font fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-table-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithMismatchedTableKeyedCompatId,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithTableKeyedDecodedSizeExceedingMax(fontFormat, testName):
+    """
+    Set maxUncompressedLength of the 'head' TablePatch in each table-keyed
+    patch to one less than the decoded size of its brotli stream.
+
+    Tests apply-table-keyed step 5: 'If the decoded data is larger than
+    maxUncompressedLength return an error.'
+
+    The decoded contents of the 'head' entry are a complete 'head' table,
+    which is always exactly 54 bytes (and the encoder declares exactly that),
+    so lowering the field to 53 guarantees the decoded data exceeds the
+    declared maximum. Only this one header field in one entry is changed; the
+    brotli stream is left untouched. A conforming client detects the overflow
+    and rejects the patch, so the IFT font fails to render and the fallback
+    font shows PASS.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkFile in glob.glob(os.path.join(destDir, "*_tk")):
+        with open(tkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        _, start, _ = findTableKeyedPatchEntry(data, b"head")
+        maxLength = struct.unpack(">I", data[start + 5:start + 9])[0]
+        assert maxLength == 54, "Unexpected head maxUncompressedLength %d" % maxLength
+        struct.pack_into(">I", data, start + 5, maxLength - 1)
+
+        with open(tkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-table-keyed_reject-decoded-size-exceeds-max"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch decoded size exceeds maxUncompressedLength",
+    description="The maxUncompressedLength field of the 'head' entry in each "
+                "table-keyed patch is set to one less than the decoded size of its "
+                "brotli stream. A conforming client must reject the patch when the "
+                "decoded data is larger than maxUncompressedLength (Apply table "
+                "keyed patch, step 5), so the IFT font fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-table-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithTableKeyedDecodedSizeExceedingMax,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithTableKeyedMissingDictionaryTable(fontFormat, testName):
+    """
+    Change the tag of the 'head' TablePatch in each table-keyed patch to
+    'gvar', a table that is not present in the base font.
+
+    Tests apply-table-keyed step 5: 'Otherwise, decode brotliStream ... using
+    the table identified by tag in base font subset as a shared LZ77
+    dictionary. If no such table exists return an error.'
+
+    The entry has neither flags bit 0 (replace) nor bit 1 (remove) set, so a
+    conforming client takes the shared-dictionary path, finds that the base
+    font has no 'gvar' table to use as the dictionary, and rejects the patch.
+    The IFT font then fails to render and the fallback font shows PASS.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkFile in glob.glob(os.path.join(destDir, "*_tk")):
+        with open(tkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        _, start, _ = findTableKeyedPatchEntry(data, b"head")
+        flags = data[start + 4]
+        assert flags & 0b11 == 0, "head entry does not use the shared-dictionary path"
+        data[start:start + 4] = b"gvar"
+
+        with open(tkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-table-keyed_reject-missing-dictionary-table"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch shared dictionary table missing from the base font",
+    description="The tag of the 'head' entry in each table-keyed patch is changed to "
+                "'gvar', which is not present in the base font. The entry uses the "
+                "shared-dictionary decode path, so a conforming client must reject "
+                "the patch because the base font has no such table to use as the "
+                "dictionary (Apply table keyed patch, step 5), and the IFT font "
+                "fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-table-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithTableKeyedMissingDictionaryTable,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithTableKeyedUnconsumedBrotliData(fontFormat, testName):
+    """
+    Append extra bytes after the end of the 'head' TablePatch brotli stream in
+    each table-keyed patch.
+
+    Tests apply-table-keyed step 5: 'If there is any data in brotliStream
+    which was not used by the decoding process return an error.'
+
+    Four bytes are inserted at the end of the entry and all following patches
+    offsets are adjusted, so the offsets stay sorted and every other entry is
+    untouched. The brotli stream itself is unmodified and still decodes to the
+    declared size, but the appended bytes sit inside the entry after the
+    stream's end marker and are never consumed by the decoder. A conforming
+    client detects the unconsumed data and rejects the patch, so the IFT font
+    fails to render and the fallback font shows PASS.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkFile in glob.glob(os.path.join(destDir, "*_tk")):
+        with open(tkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        index, _, end = findTableKeyedPatchEntry(data, b"head")
+        junk = b"\xde\xad\xbe\xef"
+
+        offsets = readTableKeyedPatchOffsets(data)
+        for i in range(index + 1, len(offsets)):
+            struct.pack_into(">I", data, 26 + i * 4, offsets[i] + len(junk))
+        data[end:end] = junk
+
+        with open(tkFile, "wb") as f:
+            f.write(data)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-table-keyed_reject-unconsumed-brotli-data"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch with brotli data not consumed by decoding",
+    description="Four extra bytes are appended after the end of the brotli stream "
+                "of the 'head' entry in each table-keyed patch (offsets adjusted "
+                "accordingly). The decoder never consumes them, so a conforming "
+                "client must reject the patch (Apply table keyed patch, step 5), "
+                "and the IFT font fails to render.",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-table-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithTableKeyedUnconsumedBrotliData,
+    funcArgs=(identifierString,)
+)
+
+
+def makeIFTWithTableKeyedDuplicateTagEntry(fontFormat, testName):
+    """
+    Append a second 'head' TablePatch entry, whose brotli stream is garbage,
+    to the end of each table-keyed patch.
+
+    Tests apply-table-keyed step 5: 'If an entry in patches was previously
+    applied that has the same tag as this entry, then ignore this entry and
+    continue the iteration to the next one.'
+
+    Entries are processed in listed order, so the original (valid) 'head'
+    entry is applied first and a conforming client must skip the appended
+    duplicate without ever decoding it, leaving the font fully functional.
+    A non-conforming client that processes the duplicate fails on the garbage
+    stream (or corrupts the head table), so the IFT font does not render.
+
+    shouldShowIFT=True: ignoring the duplicate renders 'PASS' via the IFT
+    font; a client that does not skip it shows FAIL.
+    """
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    nft.getIFTTableData()
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    for tkFile in glob.glob(os.path.join(destDir, "*_tk")):
+        with open(tkFile, "rb") as f:
+            data = bytearray(f.read())
+
+        # The original 'head' entry must exist (and so be applied first).
+        findTableKeyedPatchEntry(data, b"head")
+
+        offsets = readTableKeyedPatchOffsets(data)
+        patchesCount = len(offsets) - 1
+        assert offsets[0] == 26 + 4 * (patchesCount + 1)
+
+        # Duplicate 'head' entry: shared-dictionary path (flags = 0), declared
+        # decoded size 54, and a stream that is not valid brotli data.
+        duplicate = b"head" + bytes([0]) + struct.pack(">I", 54) + b"\xde\xad\xbe\xef" * 4
+
+        # Inserting one more offset into the patches array shifts all entry
+        # data forward by 4 bytes; the duplicate entry is appended at the end.
+        newOffsets = [offset + 4 for offset in offsets]
+        newOffsets.append(newOffsets[-1] + len(duplicate))
+
+        newData = bytearray()
+        newData.extend(data[0:24])
+        newData.extend(struct.pack(">H", patchesCount + 1))
+        for offset in newOffsets:
+            newData.extend(struct.pack(">I", offset))
+        newData.extend(data[offsets[0]:])
+        newData.extend(duplicate)
+
+        with open(tkFile, "wb") as f:
+            f.write(newData)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "apply-table-keyed_ignore-duplicate-tag-entry"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Table keyed patch duplicate-tag entry is ignored",
+    description="A second 'head' entry whose brotli stream is garbage is appended to "
+                "each table-keyed patch. An entry with the same tag as a previously "
+                "applied entry must be ignored (Apply table keyed patch, step 5), so "
+                "the IFT font renders 'PASS' only if the client skips the duplicate "
+                "without decoding it.",
+    shouldShowIFT=True,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#apply-table-keyed",
+    fontFormats=fontFormats,
+    func=makeIFTWithTableKeyedDuplicateTagEntry,
+    funcArgs=(identifierString,)
+)
+
+
 # ------------------
 # Generate the Index
 # ------------------

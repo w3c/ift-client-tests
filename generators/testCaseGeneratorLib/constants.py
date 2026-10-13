@@ -1,4 +1,4 @@
-# IFT patch map (Format 2) header offsets — see https://www.w3.org/TR/IFT/#patch-map-format-2
+# IFT patch map table header offsets — see https://www.w3.org/TR/IFT/#patch-map-table
 
 IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29

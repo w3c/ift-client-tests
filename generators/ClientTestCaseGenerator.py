@@ -47,10 +47,11 @@ from testCaseGeneratorLib.helpers import (
 IFT_ENTRIES_OFFSET_START = 25
 IFT_ENTRIES_OFFSET_END = 29
 IFT_FORMAT_OFFSET = 0
-# URL Template offsets (Format 2 fixed header layout):
+# Patch map table fixed header layout:
 # format(1) + reserved(3) + flags(1) + compatibilityId(16) +
 # defaultPatchFormat(1) + entryCount(3) + entriesOffset(4) +
 # entryIdStringDataOffset(4) + urlTemplateLength(2) + urlTemplate[...]
+IFT_DEFAULT_PATCH_FORMAT_OFFSET = 21
 IFT_URL_TEMPLATE_OFFSET = 35
 # Other constants
 IFT_FONT_FILENAME = "myfont-mod.ift.woff2"
@@ -215,6 +216,13 @@ def makeIFTWithFormatID(fontFormat, formatId, testName):
     nft.setIFTTableData(bytes(raw))
     nft.writeTestIFTFile()
 
+def makeIFTWithDefaultPatchFormat(fontFormat, patchFormat, testName):
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    raw = nft.getIFTTableData()
+    raw[IFT_DEFAULT_PATCH_FORMAT_OFFSET] = patchFormat
+    nft.setIFTTableData(bytes(raw))
+    nft.writeTestIFTFile()
+
 testType = "client"
 
 testTag = "conform-patchmap-valid-format-number"
@@ -222,11 +230,29 @@ identifierString= "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF","CFF"]
 writeTest(
     identifier=identifierString,
+    title="Patch map with invalid defaultPatchFormat value",
+    description="The patch map table 'defaultPatchFormat' field is set to 4, which is not one of "
+                "the format numbers from the Formats Summary table (valid values are 1, 2, 3). "
+                "A conforming client must reject the font (Interpreting a Patch Map, step 1).",
+    shouldShowIFT=False,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink= "#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithDefaultPatchFormat,
+    funcArgs=(4, identifierString)
+)
+
+testTag = "interpreting-patch-map_reject-invalid-format"
+identifierString= "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF","CFF"]
+writeTest(
+    identifier=identifierString,
     title="Patch map with invalid format number",
-    description="The patch map table 'format' field is set to 3, which is an invalid format number (must be 2).",
+    description="The patch map table 'format' field is set to 3, which is an invalid format number (must be 2). "
+                "A conforming client must return an error (Interpreting a Patch Map, step 1).",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink= "#%s" % identifierString,
+    specLink="#interpreting-patch-map",
     fontFormats=fontFormats,
     func=makeIFTWithFormatID,
     funcArgs=(3, identifierString)

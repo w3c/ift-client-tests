@@ -949,7 +949,7 @@ def makeIFTWithInvalidSparseBitSet(fontFormat, testName):
     Corrupt the first codePoints sparse bit set in the IFT table so that its
     height H exceeds the maximum allowed for the encoded branch factor.
 
-    Tests conform-sparse-bit-set-decoding: if the decoding algorithm returns
+    Tests sparse-bit-set-decoding step 2: if the decoding algorithm returns
     an error the client must treat the patch map as invalid and not apply any
     patches, causing the IFT font to fail to render.
     """
@@ -960,7 +960,7 @@ def makeIFTWithInvalidSparseBitSet(fontFormat, testName):
     nft.writeTestIFTFile()
 
 
-testTag = "conform-sparse-bit-set-decoding"
+testTag = "sparse-bit-set-decoding_reject-height-exceeds-max"
 identifierString = "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF", "CFF"]
 writeTest(
@@ -971,7 +971,7 @@ writeTest(
                 "the patch map as invalid and not render using the IFT font.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink="#%s" % identifierString,
+    specLink="#sparse-bit-set-decoding",
     fontFormats=fontFormats,
     func=makeIFTWithInvalidSparseBitSet,
     funcArgs=(identifierString,)

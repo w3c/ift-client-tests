@@ -39,6 +39,8 @@ from testCaseGeneratorLib.iftFile import IFTFile
 from testCaseGeneratorLib.helpers import (
     decode_id32_to_int,
     id32_no_strip,
+    encode_id32,
+    parse_format2_entries,
     replace_format2_url_template,
     compute_id64_file_name,
     compute_id64_no_strip,
@@ -2028,6 +2030,192 @@ writeTest(
     fontFormats=fontFormats,
     func=makeIFTWithTableKeyedDuplicateTagEntry,
     funcArgs=(identifierString,)
+)
+
+
+# --------------------------------------------------------------------------
+# conform-required-selection-criteria (issue #21)
+#
+# "The following selection criteria minimizes round trips and must be used
+# by the client when selecting a single partial or full invalidation patch
+# in step 8 of Extend an Incremental Font Subset".
+#
+# The standard build never gives the client a choice to make: for the text
+# on this page exactly one invalidating (table keyed) entry intersects the
+# target subset definition. This test uses the SELECTION build instead (see
+# the Makefile): the STOP_EXTEND decoy-glyph font -- the PASS/FAIL letters
+# plus an independent code point U+E000 -- re-encoded without prefetch
+# lists. With the off-screen decoy code point on the page, its initial font
+# lists three partial invalidation entries that all intersect the target
+# subset definition:
+#
+#   - an entry for the code point segment {A, F, I, L, P, S},
+#   - an entry for the code point segment {U+E000}, and
+#   - a conjunctive entry whose children are the two entries above, whose
+#     single patch adds both segments at once.
+#
+# Following the selection criteria the client computes each candidate's
+# total subset definition (its own unioned with its children's), intersects
+# that with the target, and must pick an entry whose intersection is not a
+# strict subset of any other candidate's. Only the combined entry qualifies:
+# its intersection is a strict superset of both single-segment entries'.
+# Picking either single-segment entry instead costs an extra round trip,
+# which is exactly what the criteria exist to prevent.
+#
+# An extra round trip is not observable by this harness, so the two
+# single-segment patch files are corrupted (invalid format tag, a non-load
+# error) while the combined patch is left completely valid. A conforming
+# client selects the combined entry, applies its patch and renders PASS. A
+# client that selects either single-segment entry hits a corrupted patch,
+# must stop extending (conform-stop-extend-after-errors) and falls back to
+# FAIL.
+#
+# Without prefetch lists the combined entry references a patch file of its
+# own. With them (as in the STOP_EXTEND build) its first patch is the very
+# same file as the letters-only entry's, so the selection could not be told
+# apart by which file is loaded -- hence the separate build.
+# --------------------------------------------------------------------------
+
+PASS_FAIL_CODEPOINTS = set(ord(c) for c in "AFILPS")
+# "{id32}.ift_tk" -- the template the encoder emits for table keyed patches.
+TABLE_KEYED_URL_TEMPLATE = b"\x80\x07.ift_tk"
+
+
+def makeIFTWithCorruptedSingleSegmentPatches(fontFormat, testName):
+    """
+    Use the SELECTION build and corrupt the patch files of the two
+    single-segment table keyed entries ({A,F,I,L,P,S} and {U+E000}), leaving
+    the combined entry's patch -- the one the selection criteria require the
+    client to pick -- completely valid.
+
+    The entries are located by interpreting the initial font's IFT patch map
+    rather than by hard coded ids, and the structure this test depends on is
+    asserted so that an encoder or segmentation change cannot silently turn
+    the test into a no-op.
+    """
+    destDir = os.path.join(clientTestDirectory, testName, fontFormat)
+    if not os.path.exists(destDir):
+        shutil.copytree(
+            os.path.join(buildDirectory, "SELECTION", "IFT", fontFormat),
+            destDir,
+        )
+
+    builtFontPath = os.path.join(destDir, "font.ift.woff2")
+    if os.path.exists(builtFontPath):
+        os.rename(builtFontPath, os.path.join(destDir, IFT_FONT_FILENAME))
+
+    font = TTFont(os.path.join(destDir, IFT_FONT_FILENAME))
+    iftData = bytes(font["IFT "].data)
+    templateLength = struct.unpack(
+        ">H", iftData[IFT_URL_TEMPLATE_OFFSET - 2:IFT_URL_TEMPLATE_OFFSET]
+    )[0]
+    template = iftData[IFT_URL_TEMPLATE_OFFSET:IFT_URL_TEMPLATE_OFFSET + templateLength]
+    assert template == TABLE_KEYED_URL_TEMPLATE, (
+        "Unexpected table keyed URL template %r in %s" % (template, destDir)
+    )
+    entries = parse_format2_entries(iftData)
+
+    def findEntry(predicate, what):
+        matches = [
+            index for index, entry in enumerate(entries)
+            if not entry["ignored"] and predicate(entry)
+        ]
+        assert len(matches) == 1, (
+            "Expected exactly one %s entry in the IFT table of %s, found %d. "
+            "If the encoder or segmentation changed, fix the SELECTION build "
+            "(see Makefile) rather than loosening this assertion."
+            % (what, destDir, len(matches))
+        )
+        return matches[0]
+
+    def isCodepointOnly(entry):
+        return not (entry["children"] or entry["features"] or entry["designSpace"])
+
+    lettersIndex = findEntry(
+        lambda e: isCodepointOnly(e) and e["codepoints"] == PASS_FAIL_CODEPOINTS,
+        "PASS/FAIL letters",
+    )
+    decoyIndex = findEntry(
+        lambda e: isCodepointOnly(e) and e["codepoints"] == {DECOY_CODEPOINT},
+        "decoy code point",
+    )
+    combinedIndex = findEntry(
+        lambda e: e["conjunctive"]
+        and sorted(e["children"]) == sorted([lettersIndex, decoyIndex])
+        and not (e["codepoints"] or e["features"] or e["designSpace"]),
+        "combined (letters AND decoy)",
+    )
+
+    letters = entries[lettersIndex]
+    decoy = entries[decoyIndex]
+    combined = entries[combinedIndex]
+
+    # All three must be partial invalidation entries so that they compete in
+    # the same group of step 8 of Extend an Incremental Font Subset.
+    for entry in (letters, decoy, combined):
+        assert entry["patchFormat"] == 2, (
+            "Expected a partial invalidation (format 2) entry, got format %d"
+            % entry["patchFormat"]
+        )
+
+    # The combined entry must map to a patch file of its own, otherwise
+    # selecting it would load the same file as one of the single-segment
+    # entries and the choice would be unobservable.
+    assert len(combined["ids"]) == 1, (
+        "Combined entry carries a prefetch list %s -- was the SELECTION build "
+        "encoded with use_prefetch_lists disabled?" % combined["ids"]
+    )
+    assert combined["ids"][0] not in (letters["ids"][0], decoy["ids"][0]), (
+        "Combined entry shares its patch (id %d) with a single-segment entry"
+        % combined["ids"][0]
+    )
+
+    def patchPath(entry):
+        return os.path.join(destDir, encode_id32(entry["ids"][0]) + ".ift_tk")
+
+    # Corrupt the two single-segment patches: an invalid format tag is a
+    # non-load error, so a client that selects either of them must stop
+    # extending rather than retry with another entry.
+    for entry in (letters, decoy):
+        path = patchPath(entry)
+        with open(path, "rb") as f:
+            data = bytearray(f.read())
+        assert data[0:4] == b"iftk", "%s is not a table keyed patch" % path
+        data[0:4] = b"XXXX"
+        with open(path, "wb") as f:
+            f.write(data)
+
+    # The combined entry's patch must remain valid and untouched.
+    with open(patchPath(combined), "rb") as f:
+        tag = f.read(4)
+    assert tag == b"iftk", (
+        "%s was expected to remain a valid table keyed patch (tag 'iftk') "
+        "but has tag %r." % (patchPath(combined), tag)
+    )
+
+
+testTag = "conform-required-selection-criteria"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF", "CFF"]
+writeTest(
+    identifier=identifierString,
+    title="Invalidating patch selection picks the entry with the largest intersection",
+    description="The initial font lists three partial invalidation entries that intersect "
+                "the requested text: one for the PASS/FAIL letters, one for an off-screen "
+                "decoy code point (U+E000), and a conjunctive entry combining both whose "
+                "single patch adds everything at once. The selection criteria require the "
+                "client to pick the combined entry, since its intersection with the target "
+                "subset definition is a strict superset of the other two. Only the two "
+                "single-segment patch files are corrupted (invalid format tag); the "
+                "combined patch is valid, so the IFT font renders PASS only if the client "
+                "selects the combined entry.",
+    shouldShowIFT=True,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#%s" % testTag,
+    fontFormats=fontFormats,
+    func=makeIFTWithCorruptedSingleSegmentPatches,
+    funcArgs=(identifierString,),
+    extraHTML=_makeDecoyCodepointSpan(),
 )
 
 

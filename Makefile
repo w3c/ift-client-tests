@@ -15,6 +15,7 @@ IFTClient/Tests/xhtml1/index.html: \
 	build/IFT/GLYF/font.ift.woff2 build/IFT/CFF/font.ift.woff2 \
 	build/URL_TEMPLATE/IFT/GLYF/font.ift.woff2 build/URL_TEMPLATE/IFT/CFF/font.ift.woff2 \
 	build/STOP_EXTEND/IFT/GLYF/font.ift.woff2 build/STOP_EXTEND/IFT/CFF/font.ift.woff2 \
+	build/SELECTION/IFT/GLYF/font.ift.woff2 build/SELECTION/IFT/CFF/font.ift.woff2 \
 	build/subsettedFonts/cff-fallback.otf build/subsettedFonts/glyf-fallback.ttf
 	cd generators/; python3 ./ClientTestCaseGenerator.py
 
@@ -125,6 +126,44 @@ build/STOP_EXTEND/IFT/CFF/font.ift.woff2: build/config/cff_stopextend_segmentati
 		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift-stopextend.otf \
 		--plan=$(CURDIR)/build/config/cff_stopextend_segmentation_plan.txtpb \
 		--output_path=$(CURDIR)/build/STOP_EXTEND/IFT/CFF \
+		--output_font="font.ift.woff2"
+
+# --------------------------------------------------------------------------
+# Competing-candidates variant used by conform-required-selection-criteria
+# (issue #21). Re-encodes the STOP_EXTEND decoy-glyph fonts from the same
+# segmentation plan but with use_prefetch_lists disabled. Without prefetch
+# lists the table keyed entry that adds both code point segments at once
+# ({A,F,I,L,P,S} and U+E000) gets a patch file of its own instead of reusing
+# the single-segment patch as its first step, so which of the competing
+# invalidating entries the client selects is observable from the patch file
+# it loads. See makeIFTWithCorruptedSingleSegmentPatches in
+# generators/ClientTestCaseGenerator.py for details.
+# --------------------------------------------------------------------------
+
+build/config/glyf_selection_segmentation_plan.txtpb: build/config/glyf_stopextend_segmentation_plan.txtpb
+	mkdir -p build/config/
+	grep -q '^use_prefetch_lists: true$$' build/config/glyf_stopextend_segmentation_plan.txtpb
+	sed 's/^use_prefetch_lists: true$$/use_prefetch_lists: false/' build/config/glyf_stopextend_segmentation_plan.txtpb > build/config/glyf_selection_segmentation_plan.txtpb
+
+build/config/cff_selection_segmentation_plan.txtpb: build/config/cff_stopextend_segmentation_plan.txtpb
+	mkdir -p build/config/
+	grep -q '^use_prefetch_lists: true$$' build/config/cff_stopextend_segmentation_plan.txtpb
+	sed 's/^use_prefetch_lists: true$$/use_prefetch_lists: false/' build/config/cff_stopextend_segmentation_plan.txtpb > build/config/cff_selection_segmentation_plan.txtpb
+
+build/SELECTION/IFT/GLYF/font.ift.woff2: build/config/glyf_selection_segmentation_plan.txtpb build/subsettedFonts/glyf-ift-stopextend.ttf
+	mkdir -p build/SELECTION/IFT/GLYF
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/subsettedFonts/glyf-ift-stopextend.ttf \
+		--plan=$(CURDIR)/build/config/glyf_selection_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/SELECTION/IFT/GLYF \
+		--output_font="font.ift.woff2"
+
+build/SELECTION/IFT/CFF/font.ift.woff2: build/config/cff_selection_segmentation_plan.txtpb build/subsettedFonts/cff-ift-stopextend.otf
+	mkdir -p build/SELECTION/IFT/CFF
+	cd encoder; bazel run $(BAZEL_OPTS) @ift_encoder//util:font2ift -- \
+		--input_font=$(CURDIR)/build/subsettedFonts/cff-ift-stopextend.otf \
+		--plan=$(CURDIR)/build/config/cff_selection_segmentation_plan.txtpb \
+		--output_path=$(CURDIR)/build/SELECTION/IFT/CFF \
 		--output_font="font.ift.woff2"
 
 clean:

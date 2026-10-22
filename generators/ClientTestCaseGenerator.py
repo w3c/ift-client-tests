@@ -31,7 +31,8 @@ from testCaseGeneratorLib.paths import (
     clientTestDirectory,
     clientTestResourcesDirectory,
     fallbackFontPath,
-    buildDirectory
+    buildDirectory,
+    subsetFontPath
 )
 from testCaseGeneratorLib.html import generateClientIndexHTML, expandSpecLinks
 from testCaseGeneratorLib.iftFile import IFTFile
@@ -951,7 +952,7 @@ def makeIFTWithInvalidSparseBitSet(fontFormat, testName):
     Corrupt the first codePoints sparse bit set in the IFT table so that its
     height H exceeds the maximum allowed for the encoded branch factor.
 
-    Tests conform-sparse-bit-set-decoding: if the decoding algorithm returns
+    Tests sparse-bit-set-decoding step 2: if the decoding algorithm returns
     an error the client must treat the patch map as invalid and not apply any
     patches, causing the IFT font to fail to render.
     """
@@ -962,7 +963,7 @@ def makeIFTWithInvalidSparseBitSet(fontFormat, testName):
     nft.writeTestIFTFile()
 
 
-testTag = "conform-sparse-bit-set-decoding"
+testTag = "sparse-bit-set-decoding_reject-height-exceeds-max"
 identifierString = "%s-%s" % (testType, testTag)
 fontFormats = ["GLYF", "CFF"]
 writeTest(
@@ -973,7 +974,7 @@ writeTest(
                 "the patch map as invalid and not render using the IFT font.",
     shouldShowIFT=False,
     credits=[dict(title="Scott Treude", role="author", link="http://treude.com")],
-    specLink="#%s" % identifierString,
+    specLink="#sparse-bit-set-decoding",
     fontFormats=fontFormats,
     func=makeIFTWithInvalidSparseBitSet,
     funcArgs=(identifierString,)
@@ -2215,6 +2216,217 @@ writeTest(
     func=makeIFTWithCorruptedSingleSegmentPatches,
     funcArgs=(identifierString,),
     extraHTML=_makeDecoyCodepointSpan(),
+)
+
+
+# --------------------------------------------------------------------------
+# conform-updating-glyf-updates-loca (issue #26)
+#
+# "When updating glyf the loca table must be updated as well."
+#
+# A loca update has two halves. (1) The entries for the patched glyphs
+# themselves must change: in the standard build every patched glyph is
+# empty in the base font (loca length 0) and non-empty in the patch, so a
+# client that rewrites glyf but leaves loca alone still reads them as empty
+# -- apply-glyph-keyed_insert-glyph-data already fails such a client.
+# (2) The entries for glyphs that are NOT in the patch but follow the
+# patched glyphs in glyph order must be shifted by the inserted data. The
+# standard build cannot observe this: the only unpatched glyph after the
+# patched range (gid 8) is never rendered.
+#
+# This test makes (2) observable. The 'S' outline (gid 7, the highest glyph
+# in the glyph keyed patch) is moved out of the patch into the base font's
+# glyf/loca, leaving A/F/I/L/P (gids 2-6) to be inserted by the patch. The
+# IFT font renders 'P' as the ligature P A S S, so:
+#   - conforming client: A..P inserted, loca rebuilt for every glyph that
+#     follows them (S at gid 7, glyph 8)                      -> PASS
+#   - loca left stale: P and A read as empty; S's old offset (0) now points
+#     at the start of the inserted A data
+#   - loca updated only for the patched gids 2-6, the entries for gids 7-8
+#     not shifted: S read from its pre-insertion offset
+# In both failure cases loca no longer matches glyf. Chromium's font
+# sanitizer rejects such a font outright, so the fallback font renders
+# FAIL; a renderer that tolerated it would show blank/garbage glyphs.
+# Neither can render PASS.
+#
+# GLYF only: loca is glyf-specific (CFF carries its own per-glyph offsets).
+# --------------------------------------------------------------------------
+
+def readGlyphPatches(data):
+    """
+    Parse the GlyphPatches table of a glyph keyed patch file (the full file
+    bytes, outer header included). Returns (gidSize, tableCount, gids,
+    tables, glyphData) where glyphData[i*glyphCount + j] is the bytes for
+    tables[i] / gids[j].
+
+    Outer header: format(4) reserved(4) flags(1) compatibilityId(16)
+                  maxUncompressedLength(4) brotliStream(...)
+    GlyphPatches (after brotli decompression):
+      0-3:   glyphCount (uint32)
+      4:     tableCount (uint8)
+      5+:    glyphIds[glyphCount]  (uint16 or uint24, per flags bit 0)
+      then:  tables[tableCount]    (Tag, 4 bytes each)
+      then:  glyphDataOffsets[glyphCount * tableCount + 1] (Offset32, from
+             the start of GlyphPatches)
+      then:  glyphData[variable]
+    """
+    import brotli
+
+    flags = data[8]
+    gidSize = 3 if (flags & 1) else 2
+    dec = brotli.decompress(bytes(data[29:]))
+
+    glyphCount = struct.unpack(">I", dec[0:4])[0]
+    tableCount = dec[4]
+    pos = 5
+    gids = [int.from_bytes(dec[pos + i * gidSize:pos + (i + 1) * gidSize], "big")
+            for i in range(glyphCount)]
+    pos += glyphCount * gidSize
+    tables = [bytes(dec[pos + i * 4:pos + (i + 1) * 4]) for i in range(tableCount)]
+    pos += tableCount * 4
+    numOffsets = glyphCount * tableCount + 1
+    offsets = [struct.unpack(">I", dec[pos + i * 4:pos + (i + 1) * 4])[0]
+               for i in range(numOffsets)]
+    glyphData = [bytes(dec[offsets[i]:offsets[i + 1]]) for i in range(numOffsets - 1)]
+    return gidSize, tableCount, gids, tables, glyphData
+
+
+def writeGlyphPatches(data, gidSize, gids, tables, glyphData):
+    """
+    Rebuild the GlyphPatches table from its parts and write it back into the
+    glyph keyed patch file bytes, updating maxUncompressedLength to match.
+    """
+    import brotli
+
+    glyphCount = len(gids)
+    tableCount = len(tables)
+    assert len(glyphData) == glyphCount * tableCount
+    header = struct.pack(">I", glyphCount) + bytes([tableCount])
+    header += b"".join(gid.to_bytes(gidSize, "big") for gid in gids)
+    header += b"".join(tables)
+    offset = len(header) + 4 * (glyphCount * tableCount + 1)
+    offsets = [offset]
+    for blob in glyphData:
+        offset += len(blob)
+        offsets.append(offset)
+    rebuilt = header + b"".join(struct.pack(">I", o) for o in offsets) + b"".join(glyphData)
+
+    data[29:] = brotli.compress(rebuilt)
+    struct.pack_into(">I", data, 25, len(rebuilt))
+
+
+def makeIFTWithUnpatchedGlyphAfterPatchedGlyphs(fontFormat, testName):
+    """
+    Move the highest-gid glyph ('S', gid 7) out of every glyph keyed patch
+    file and into the base font's glyf/loca tables. The remaining patched
+    glyphs (gids 2-6) stay empty in the base font, so after a conforming
+    patch application loca must change for both the patched glyphs and for
+    every glyph that follows them (gids 7 and 8).
+
+    Each patch "slot" is compiled into more than one physical _gk file
+    (e.g. "00.1"/"00.2", alternate versions for different client states),
+    so every file is modified identically.
+    """
+    from fontTools.ttLib.tables._g_l_y_f import Glyph
+
+    assert fontFormat == "GLYF", "loca only exists for glyf fonts"
+
+    nft = IFTFile(testName, fontFormat, IFT_FONT_FILENAME)
+    # Rewriting glyf/loca makes fontTools recompile them (and touch 'head').
+    # Keep the glyph bytes and the 'head' timestamp as the encoder produced
+    # them; nothing else in the font should change.
+    nft.font.recalcBBoxes = False
+    nft.font.recalcTimestamp = False
+
+    destDir = os.path.join(nft.testDirectory, fontFormat)
+    gkFiles = sorted(glob.glob(os.path.join(destDir, "*_gk")))
+    assert gkFiles, "No _gk patch files found in %s" % destDir
+
+    keptGid = None
+    keptData = None
+    patchedGids = None
+    for gkFile in gkFiles:
+        with open(gkFile, "rb") as f:
+            data = bytearray(f.read())
+        gidSize, tableCount, gids, tables, glyphData = readGlyphPatches(data)
+        assert tables == [b"glyf"], "%s: expected a glyf-only patch, got %r" % (gkFile, tables)
+        assert gids == sorted(gids) and len(gids) >= 2, (
+            "%s: need at least two ascending glyph ids, got %r" % (gkFile, gids)
+        )
+
+        gid, blob = gids[-1], glyphData[-1]
+        if keptGid is None:
+            keptGid, keptData, patchedGids = gid, blob, gids[:-1]
+        assert (gid, blob, gids[:-1]) == (keptGid, keptData, patchedGids), (
+            "%s differs from the other _gk files; all physical files for the "
+            "patch slot must agree so every one of them can be modified "
+            "identically." % gkFile
+        )
+
+        writeGlyphPatches(data, gidSize, gids[:-1], tables, glyphData[:-1])
+        with open(gkFile, "wb") as f:
+            f.write(data)
+
+    # The kept glyph must be the 'S' that the P -> P A S S ligature renders;
+    # otherwise keeping it in the base font proves nothing. The encoder
+    # preserves the glyph order of the subsetted source font, which still has
+    # a cmap for S.
+    subsetFont = TTFont(os.path.join(subsetFontPath, "glyf-ift.ttf"))
+    sGid = subsetFont.getGlyphID(subsetFont["cmap"].getBestCmap()[ord("S")])
+    assert sGid == keptGid, (
+        "Expected the highest glyph in the glyph keyed patch to be 'S' "
+        "(gid %d in the subsetted font) but it is gid %d. The ligature "
+        "P A S S must render the glyph that stays in the base font." % (sGid, keptGid)
+    )
+    assert keptData, "The 'S' glyph data in the patch is empty"
+
+    glyphOrder = nft.font.getGlyphOrder()
+    locations = nft.font["loca"].locations
+    baseLengths = [locations[i + 1] - locations[i] for i in range(len(glyphOrder))]
+    assert baseLengths[keptGid] == 0, (
+        "gid %d already has %d bytes of glyph data in the base font"
+        % (keptGid, baseLengths[keptGid])
+    )
+    # A stale loca can only be caught if no patched glyph already has data
+    # of the same length in the base font.
+    for gid, blob in zip(patchedGids, glyphData[:-1]):
+        assert baseLengths[gid] != len(blob), (
+            "gid %d has the same glyph length (%d) in the base font and in the "
+            "patch, so a client that never rewrites loca would render it "
+            "correctly by accident." % (gid, len(blob))
+        )
+    assert keptGid > max(patchedGids), (
+        "The kept glyph (gid %d) must follow every patched glyph (%r) in "
+        "glyph order, or its loca entry would not need to shift." % (keptGid, patchedGids)
+    )
+
+    glyf = nft.font["glyf"]
+    glyf.glyphs[glyphOrder[keptGid]] = Glyph(keptData)
+
+    nft.writeTestIFTFile()
+
+
+testTag = "conform-updating-glyf-updates-loca"
+identifierString = "%s-%s" % (testType, testTag)
+fontFormats = ["GLYF"]
+writeTest(
+    identifier=identifierString,
+    title="Applying a glyph keyed patch to glyf also updates loca",
+    description="The 'S' outline (gid 7, the last glyph in the glyph keyed patch) is "
+                "moved out of the patch into the base font's glyf/loca, while A, F, I, "
+                "L and P (gids 2-6) stay empty in the base font and are inserted by "
+                "the patch. The IFT font renders 'P' as the ligature P A S S, so PASS "
+                "appears only if the client rebuilds loca for both the inserted glyphs "
+                "and the glyphs that follow them (Apply glyph keyed patch, step 4). A "
+                "client that leaves loca stale, or shifts only the patched entries, "
+                "produces a loca that no longer matches glyf, which renders as FAIL "
+                "(font rejected) or as empty/garbage glyphs, never as PASS.",
+    shouldShowIFT=True,
+    credits=[dict(title="Takeru Suzuki", role="author", link="https://github.com/terkel")],
+    specLink="#%s" % identifierString,
+    fontFormats=fontFormats,
+    func=makeIFTWithUnpatchedGlyphAfterPatchedGlyphs,
+    funcArgs=(identifierString,)
 )
 
 

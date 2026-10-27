@@ -30,7 +30,7 @@ async function load_wasm_font(text, font_url, font_name) {
   return new FontFace(font_name, data).load();
 }
 
-async function update_all_fonts() {
+async function update_all_wasm_fonts() {
   const resultElements = document.getElementsByClassName('result');
   for (const el of resultElements) {
     const test_name = el.id.replace(/^[^-]+-/, '');
@@ -41,20 +41,12 @@ async function update_all_fonts() {
     const font_name = `${font_format}-${test_name}-IFT-Font`;
     const test = document.getElementById(test_name);
     el.style.fontFamily = `${font_name}, RobotoFallback`;
-    // Extra test text must use the same face to trigger native patch requests.
+    // Keep extra test text associated with this format's font.
     for (const target of test.querySelectorAll(`[data-ift-format="${font_format}"]`)) {
       target.style.fontFamily = el.style.fontFamily;
     }
     try {
-      if (useWasm) {
-        document.fonts.add(await load_wasm_font(test.innerText, font_url, font_name));
-        continue;
-      }
-      // Pass the URL to the browser so it handles IFT decoding and patches.
-      const font = new FontFace(font_name,
-        `url("${font_url}") format("woff2") tech(incremental)`);
-      document.fonts.add(font);
-      await font.load();
+      document.fonts.add(await load_wasm_font(test.innerText, font_url, font_name));
     } catch (error) {
       console.error(`Error updating font for ${test_name} (${font_format}):`, error);
     }
@@ -65,9 +57,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     if (useWasm) {
       await init_wasm();
+      await update_all_wasm_fonts();
+    } else {
+      // CSS handles native font loading, font matching, and patch requests.
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = new URL('./native-ift.css', import.meta.url).href;
+      document.head.appendChild(stylesheet);
     }
     console.log(`IFT loader: ${useWasm ? 'WASM polyfill' : 'native browser'}`);
-    await update_all_fonts();
   } catch (error) {
     console.error('Failed to initialize the IFT loader:', error);
   }

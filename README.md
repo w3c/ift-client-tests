@@ -58,7 +58,11 @@ make IFTClient/Tests/xhtml1/index.html
 
 This will create the html client test suite, which will be found under IFTClient/
 
-The suite uses the browser's native IFT implementation by default. To use the
+The suite uses CSS `@font-face` rules with `tech(incremental)` and the browser's
+native IFT implementation by default. The generated `resources/native-ift.css`
+assigns the fonts to the test indicators and extra test text. To use the
 WASM polyfill instead, append `?wasm=1` to the test index URL (before any `#`
 fragment). Only that mode loads the Rust client and WASM WOFF2 decoder. The
-browser console logs the selected loader; there is no automatic fallback.
+native stylesheet is not attached in WASM mode, so CSS does not also load the
+IFT fonts. The browser console logs the selected loader; there is no automatic
+fallback.

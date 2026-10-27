@@ -4,6 +4,7 @@ Test case HTML generator.
 
 import os
 import html
+import json
 
 from testCaseGeneratorLib.paths import clientTestResourcesDirectory
 
@@ -76,6 +77,32 @@ def poorManMath(text):
     return re.sub(r"\^\{(.*.)\}", r"<sup>\1</sup>", text)
 
 def generateClientIndexHTML(directory=None, testCases=[], note=None):
+    # This stylesheet is attached only in native mode. Keeping the face rules
+    # and their consumers together prevents CSS font requests in WASM mode.
+    nativeCSS = []
+    for group in testCases:
+        for test in group["testCases"]:
+            identifier = test["identifier"]
+            for fontFormat in test["fontFormats"]:
+                family = json.dumps("%s-%s-IFT-Font" % (fontFormat, identifier))
+                url = json.dumps("../%s/%s/myfont-mod.ift.woff2" % (identifier, fontFormat))
+                resultId = json.dumps("%s-%s" % (fontFormat, identifier))
+                testId = json.dumps(identifier)
+                formatValue = json.dumps(fontFormat)
+                nativeCSS.append(
+                    "@font-face {\n"
+                    "  font-family: %s;\n"
+                    "  src: url(%s) format(\"woff2\") tech(incremental);\n"
+                    "}\n"
+                    "[id=%s], [id=%s] [data-ift-format=%s] {\n"
+                    "  font-family: %s, RobotoFallback;\n"
+                    "}" % (family, url, resultId, testId, formatValue, family)
+                )
+    resourceDirectory = os.path.join(directory, "resources")
+    os.makedirs(resourceDirectory, exist_ok=True)
+    with open(os.path.join(resourceDirectory, "native-ift.css"), "w") as cssFile:
+        cssFile.write("\n\n".join(nativeCSS) + "\n")
+
     testCount = sum([len(group["testCases"]) for group in testCases])
     html_string = [
         "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">",

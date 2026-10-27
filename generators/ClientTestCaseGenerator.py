@@ -1547,9 +1547,8 @@ writeTest(
 # glyph-keyed patch alongside the usual PASS/FAIL patch.
 #
 # The decoy codepoint is placed off-screen in the test's HTML (absolute
-# positioning, not display:none/visibility:hidden -- innerText omits text
-# from elements that aren't rendered at all) so it's picked up by
-# resources/ift.js's codepoint computation and requested for extension
+# positioning, not display:none/visibility:hidden) and uses each format's
+# IFT font so the browser requests its patch for extension
 # along with the visible PASS/FAIL text, without ever being seen.
 #
 # Only the decoy's patch file is corrupted (bad format tag -> a non-load
@@ -1652,15 +1651,14 @@ def makeIFTWithDecoyPatchNonLoadError(fontFormat, testName):
 
 def _makeDecoyCodepointSpan():
     """
-    An off-screen (not display:none/visibility:hidden, since those are
-    excluded from element.innerText) span containing the decoy codepoint, so
-    it's requested for extension alongside the visible PASS/FAIL text but
-    never actually seen.
+    Off-screen text using each format's IFT font, so native rendering
+    requests the decoy patch alongside the visible PASS/FAIL text.
     """
     return (
         "\t\t\t\t\t<p style=\"position:absolute;left:-9999px;\" aria-hidden=\"true\">"
-        "&#x%X;</p>"
-    ) % DECOY_CODEPOINT
+        '<span data-ift-format="GLYF">&#x%X;</span>'
+        '<span data-ift-format="CFF">&#x%X;</span></p>'
+    ) % (DECOY_CODEPOINT, DECOY_CODEPOINT)
 
 
 testTag = "conform-stop-extend-after-errors"

@@ -1,88 +1,74 @@
-import init, { IftState } from './rust-client/pkg/rust_client.js';
+// Native IFT is the default. Add ?wasm=1 to opt into the polyfill.
+const useWasm = new URLSearchParams(window.location.search).get('wasm') === '1';
+let wasmClient;
+const states = new Map();
 
-let states = {};
+async function init_wasm() {
+  const { default: init, IftState } = await import('./rust-client/pkg/rust_client.js');
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('./cc-client/brotli.js', import.meta.url).href;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Failed to load the WASM WOFF2 decoder'));
+    document.head.appendChild(script);
+  });
+  const [module, decoder] = await Promise.all([init(), window.createModule()]);
+  wasmClient = { IftState, memory: module.memory, Woff2Decoder: decoder.Woff2Decoder };
+}
+
+async function load_wasm_font(text, font_url, font_name) {
+  if (!states.has(font_url)) {
+    states.set(font_url, wasmClient.IftState.new(font_url));
+  }
+  const state = states.get(font_url);
+  const codepoints = [...new Set(Array.from(text, character => character.codePointAt(0)))];
+  state.add_to_target_subset_definition(codepoints);
+  const subset = await state.current_font_subset({
+    unwoff2: encoded => new wasmClient.Woff2Decoder(encoded).data(),
+  });
+  const data = new Uint8Array(wasmClient.memory.buffer, subset.data(), subset.len());
+  return new FontFace(font_name, data).load();
+}
+
 async function update_all_fonts() {
-  // Get all elements with class 'result'
   const resultElements = document.getElementsByClassName('result');
-  for (let el of resultElements) {
-    let test_name = el.id.replace(/^[^-]+-/, ''); // remove format prefix
-    console.log("Processing test:", test_name);
-    let font_format = el.getAttribute('data-format');
-    let rndNum = Math.floor(Math.random() * 100000); // to break caching
-    let title_font = `${test_name}/${font_format}/myfont-mod.ift.woff2?v=${rndNum}`;
-    let title_text = document.getElementById(test_name).innerText;
-    let font_name = font_format + "-" + test_name + "-IFT-Font";
-    // check to see if element contains pass or fail class
-    let fallback_font_name = "RobotoFallback";
-    el.style.fontFamily = `${font_name}, ${fallback_font_name}`;
+  for (const el of resultElements) {
+    const test_name = el.id.replace(/^[^-]+-/, '');
+    console.log('Processing test:', test_name);
+    const font_format = el.getAttribute('data-format');
+    const rndNum = Math.floor(Math.random() * 100000);
+    const font_url = `${test_name}/${font_format}/myfont-mod.ift.woff2?v=${rndNum}`;
+    const font_name = `${font_format}-${test_name}-IFT-Font`;
+    const test = document.getElementById(test_name);
+    el.style.fontFamily = `${font_name}, RobotoFallback`;
+    // Extra test text must use the same face to trigger native patch requests.
+    for (const target of test.querySelectorAll(`[data-ift-format="${font_format}"]`)) {
+      target.style.fontFamily = el.style.fontFamily;
+    }
     try {
-      let p1 = update_fonts(title_text,
-        title_font,
-        font_name,
-        [],
-        {});
-      let f1 = await p1;
-      document.fonts.add(f1);
-    } catch (e) {
-      console.error(`Error updating font for ${test_name} (${font_format}):`, e);
-      continue; // Skip to the next element
+      if (useWasm) {
+        document.fonts.add(await load_wasm_font(test.innerText, font_url, font_name));
+        continue;
+      }
+      // Pass the URL to the browser so it handles IFT decoding and patches.
+      const font = new FontFace(font_name,
+        `url("${font_url}") format("woff2") tech(incremental)`);
+      document.fonts.add(font);
+      await font.load();
+    } catch (error) {
+      console.error(`Error updating font for ${test_name} (${font_format}):`, error);
     }
   }
 }
 
-function update_fonts(text, font_id, font_face, features, ds) {
-  let cps = new Set();
-  for (let i = 0; text.codePointAt(i); i++) {
-    cps.add(text.codePointAt(i));
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    if (useWasm) {
+      await init_wasm();
+    }
+    console.log(`IFT loader: ${useWasm ? 'WASM polyfill' : 'native browser'}`);
+    await update_all_fonts();
+  } catch (error) {
+    console.error('Failed to initialize the IFT loader:', error);
   }
-
-  let cps_array = [];
-  for (let cp of cps) {
-    cps_array.push(cp);
-  }
-
-  let axes = new Map();
-  for (let [tag, value] of Object.entries(ds)) {
-    axes.set(tag, value);
-  }
-
-  return patch_codepoints(font_id, font_face, cps_array, features, axes);
-}
-
-const woff2_decoder = {
-  unwoff2: (encoded) => {
-    let decoder = new window.Woff2Decoder(encoded);
-    return decoder.data();
-  }
-}
-
-function patch_codepoints(font_id, font_face, cps, features, axes) {
-  if (!states[font_id]) {
-    states[font_id] = IftState.new(font_id);
-  }
-  let state = states[font_id];
-
-  for (const [tag, point] of axes) {
-    state.add_design_space_to_target_subset_definition(tag, point, point);
-  }
-
-  for (const tag of features) {
-    state.add_feature_to_target_subset_definition(tag);
-  }
-
-  state.add_to_target_subset_definition(cps);
-  return state.current_font_subset(woff2_decoder).then(font => {
-    const font_data = new Uint8Array(window.ift_memory.buffer, font.data(), font.len());
-    let descriptor = {};
-    font = new FontFace(font_face, font_data, descriptor);
-    return font.load();
-  })
-}
-
-
-window.addEventListener('DOMContentLoaded', function () {
-  init().then(function (Module) {
-    window.ift_memory = Module.memory;
-    update_all_fonts();
-  });
 });

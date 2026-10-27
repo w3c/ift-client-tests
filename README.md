@@ -57,3 +57,8 @@ make IFTClient/Tests/xhtml1/index.html
 ```
 
 This will create the html client test suite, which will be found under IFTClient/
+
+The suite uses the browser's native IFT implementation by default. To use the
+WASM polyfill instead, append `?wasm=1` to the test index URL (before any `#`
+fragment). Only that mode loads the Rust client and WASM WOFF2 decoder. The
+browser console logs the selected loader; there is no automatic fallback.
